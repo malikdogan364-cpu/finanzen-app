@@ -1,10 +1,12 @@
-/* Service Worker: legt die App (nur Code, keine Daten) im Zwischenspeicher ab, damit sie offline startet. */
-const VERSION = 'finanzen-v9';        // bei jeder Änderung an der App hochzählen, dann lädt sich die App selbst neu
+/* Service Worker: legt die App (nur Code, keine Daten) im Zwischenspeicher ab, damit sie offline startet.
+   App-Dateien: zuerst aus dem Netz (immer die neueste Version), ohne Netz aus dem Speicher.
+   Texterkennung (ocr/): aus dem Speicher (groß, ändert sich nie). */
+const VERSION = 'finanzen-v10';       // bei jeder Änderung an der App hochzählen
 const DATEIEN = ['./', 'index.html', 'style.css', 'app.js', 'erfassen.js', 'werkzeuge.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(DATEIEN)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(DATEIEN.map(d => new Request(d, {cache: 'reload'})))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -12,18 +14,21 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+function mitZeitlimit(p, ms) { return Promise.race([p, new Promise((_, nein) => setTimeout(() => nein(new Error('zeit')), ms))]); }
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  if (/\/ocr\//.test(e.request.url)) {
+    e.respondWith(caches.match(e.request).then(t => t || fetch(e.request).then(r => {
+      if (r.ok) { const k = r.clone(); caches.open(VERSION).then(c => c.put(e.request, k)); }
+      return r;
+    })));
+    return;
+  }
   e.respondWith(
-    caches.match(e.request, {ignoreSearch: true}).then(treffer => {
-      if (treffer) {                                   // sofort aus dem Speicher, im Hintergrund aktualisieren
-        fetch(e.request).then(r => r.ok && caches.open(VERSION).then(c => c.put(e.request, r))).catch(() => {});
-        return treffer;
-      }
-      return fetch(e.request).then(r => {                // Texterkennungs-Dateien beim ersten Gebrauch merken (offline nutzbar)
-        if (r.ok && /\/ocr\//.test(e.request.url)) { const k = r.clone(); caches.open(VERSION).then(c => c.put(e.request, k)); }
-        return r;
-      }).catch(() => caches.match('index.html'));
-    })
+    mitZeitlimit(fetch(e.request, {cache: 'no-cache'}), 4000).then(r => {
+      if (r.ok) { const k = r.clone(); caches.open(VERSION).then(c => c.put(e.request, k)); }
+      return r;
+    }).catch(() => caches.match(e.request, {ignoreSearch: true}).then(t => t || caches.match('index.html')))
   );
 });

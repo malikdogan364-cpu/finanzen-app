@@ -418,6 +418,7 @@ function mehr() {
     `${kv('Verträge', D.vermietung.vertraege.length)}${kv('Passwort beim Öffnen', gesp ? 'ja' : 'nein')}</div>` +
     `<label class="knopf">Neue Daten laden<input type="file" id="datei2" hidden></label>` +
     `<button class="knopf hell" data-a="${gesp ? 'schutz_aus' : 'schutz_an'}">${gesp ? 'Passwortabfrage ausschalten' : 'Passwort bei jedem Öffnen verlangen'}</button>` +
+    `<button class="knopf hell" data-a="app_update">App aktualisieren <small id="app_version" style="opacity:.6"></small></button>` +
     `<button class="knopf rot" data-a="loeschen">Daten von diesem Handy löschen</button>` +
     `<div class="klein">Die Daten liegen nur in diesem Handy und wurden nie über das Internet übertragen. Änderungen machst du am PC – danach eine neue Datei erstellen und hier laden.<br><br>` +
     `Tipp: In Safari auf „Teilen“ → „Zum Home-Bildschirm“, dann startet die App wie eine normale App – auch ohne Internet.</div>`;
@@ -545,6 +546,20 @@ const AKT = {
     await DB.del('daten'); await DB.del('schluessel'); await DB.del('erfassungen');
     D = null; S.gesp = null; S.datei = null; S.key = null; if (typeof ERF !== 'undefined') ERF = []; zeigeWillkommen(); },
 };
+// App-Version anzeigen und auf Wunsch frisch laden (Daten bleiben erhalten)
+async function versionZeigen() {
+  const el = document.getElementById('app_version'); if (!el || !('caches' in window)) return;
+  try { const k = (await caches.keys()).find(n => n.startsWith('finanzen-')), txt = k ? '· ' + k.replace('finanzen-', '') : ''; if (el.textContent !== txt) el.textContent = txt; } catch (e) { /* ok */ }
+}
+new MutationObserver(versionZeigen).observe(document.documentElement, {childList: true, subtree: true});
+AKT.app_update = async () => {
+  toast('App wird aktualisiert …');
+  try {
+    if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k);
+  } catch (e) { /* ok */ }
+  location.reload();
+};
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const [name, ...p] = el.dataset.a.split('|');
@@ -632,7 +647,7 @@ async function start() {
   if ('serviceWorker' in navigator) {
     if (navigator.serviceWorker.controller)          // neue App-Version aktiv geworden -> einmal neu laden (Daten bleiben)
       navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(r => r.update()).catch(() => {});
   }
   const gesp = await DB.get('daten'); S.gesp = gesp || null;
   if (gesp) S.datei = gesp.datei || null;
