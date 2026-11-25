@@ -78,7 +78,11 @@ function sheetFreiheit() {
 }
 
 // ---------------------------------------------------------------- Wohnungs-Check (Kaufrechner)
-function kaufrechnen(p) {
+function kaufrechnen(roh) {
+  // Fehlende/kaputte Werte (z. B. aus einer älteren Datei) nie als NaN durchrechnen
+  const p = {};
+  for (const k of ['kaufpreis', 'zimmer', 'miete_pro_zimmer', 'sonstige_einnahmen', 'leerstand', 'hausgeld', 'nebenkosten_monat', 'grundsteuer', 'eigenkapital',
+    'renovierung', 'moebel', 'makler_satz', 'zinssatz', 'tilgung', 'grest_satz', 'notar_satz', 'gebaeudeanteil', 'afa_satz', 'steuersatz']) p[k] = isFinite(+roh[k]) && roh[k] !== null ? +roh[k] : 0;
   const nk = p.kaufpreis * (p.grest_satz + p.notar_satz + p.makler_satz), gesamt = p.kaufpreis + nk + p.renovierung + p.moebel;
   const darlehen = Math.max(0, gesamt - p.eigenkapital), rate = darlehen * (p.zinssatz + p.tilgung) / 12;
   const voll = p.zimmer * p.miete_pro_zimmer + p.sonstige_einnahmen, ein = voll * (1 - p.leerstand), kosten = p.hausgeld + p.nebenkosten_monat + p.grundsteuer;
@@ -127,11 +131,11 @@ function krStart(zuruecksetzen) {
   else { try { gespeichert = JSON.parse(localStorage.getItem('fin_kr3')); } catch (e) { /* ok */ } }
   KR = {...D.kauf, ...(gespeichert || {})};
   for (const [k, d] of Object.entries(KR_DEF)) {           // fehlende Werte mit Standardwerten füllen
-    if (typeof KR[k] !== 'number' || isNaN(KR[k])) KR[k] = d.std != null ? (d.pct ? d.std / 100 : d.std) : 0;
+    if (typeof KR[k] !== 'number' || !isFinite(KR[k])) KR[k] = typeof D.kauf[k] === 'number' && isFinite(D.kauf[k]) ? D.kauf[k] : d.std != null ? (d.pct ? d.std / 100 : d.std) : 0;
   }
   if (!gespeichert && !KR.makler_satz) KR.makler_satz = KR_DEF.makler_satz.std / 100;
   if (!KR.bl) KR.bl = Object.keys(BUNDESLAENDER).find(b => BUNDESLAENDER[b] / 100 === KR.grest_satz && b === 'Berlin') || '';   // deine Wohnungen liegen in Berlin
-  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || 1)));
+  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || +D.kauf.zimmer || 3)));
   for (const k of Object.keys(KR_DEF)) KR[k] = krBegrenzen(k, KR[k]);   // alte oder fremde Werte in den sinnvollen Bereich holen
 }
 const krWert = k => KR_DEF[k].pct ? KR[k] * 100 : KR[k];
