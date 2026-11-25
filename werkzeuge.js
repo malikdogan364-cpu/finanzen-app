@@ -129,13 +129,17 @@ function krStart(zuruecksetzen) {
   let gespeichert = null;
   if (zuruecksetzen) { try { localStorage.removeItem('fin_kr3'); } catch (e) { /* ok */ } }
   else { try { gespeichert = JSON.parse(localStorage.getItem('fin_kr3')); } catch (e) { /* ok */ } }
-  KR = {...D.kauf, ...(gespeichert || {})};
+  if (!gespeichert || typeof gespeichert !== 'object') gespeichert = null;
+  // ältere Datendateien haben noch keine Rechner-Startwerte → dann übliche Werte
+  const S = Object.assign({kaufpreis: 200000, zimmer: 3, miete_pro_zimmer: 550, eigenkapital: 30000, zinssatz: 0.04, tilgung: 0.02, leerstand: 0.05,
+    hausgeld: 250, nebenkosten_monat: 100, renovierung: 5000, moebel: 4500}, (D.kauf && typeof D.kauf === 'object') ? D.kauf : {});
+  KR = {...S, ...(gespeichert || {})};
   for (const [k, d] of Object.entries(KR_DEF)) {           // fehlende Werte mit Standardwerten füllen
-    if (typeof KR[k] !== 'number' || !isFinite(KR[k])) KR[k] = typeof D.kauf[k] === 'number' && isFinite(D.kauf[k]) ? D.kauf[k] : d.std != null ? (d.pct ? d.std / 100 : d.std) : 0;
+    if (typeof KR[k] !== 'number' || !isFinite(KR[k])) KR[k] = typeof S[k] === 'number' && isFinite(S[k]) ? S[k] : d.std != null ? (d.pct ? d.std / 100 : d.std) : 0;
   }
   if (!gespeichert && !KR.makler_satz) KR.makler_satz = KR_DEF.makler_satz.std / 100;
   if (!KR.bl) KR.bl = Object.keys(BUNDESLAENDER).find(b => BUNDESLAENDER[b] / 100 === KR.grest_satz && b === 'Berlin') || '';   // deine Wohnungen liegen in Berlin
-  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || +D.kauf.zimmer || 3)));
+  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || +S.zimmer || 3)));
   for (const k of Object.keys(KR_DEF)) KR[k] = krBegrenzen(k, KR[k]);   // alte oder fremde Werte in den sinnvollen Bereich holen
 }
 const krWert = k => KR_DEF[k].pct ? KR[k] * 100 : KR[k];
