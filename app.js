@@ -560,10 +560,15 @@ AKT.app_update = async () => {
   } catch (e) { /* ok */ }
   location.reload();
 };
+// Statt still nichts zu tun: kurze Meldung, damit man den Fehler sieht und melden kann
+function fehlerZeigen(err) { console.error(err); toast('Fehler: ' + ((err && err.message) || err) + ' – bitte melden'); }
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
   const [name, ...p] = el.dataset.a.split('|');
-  if (AKT[name]) { e.preventDefault(); AKT[name](...p); }
+  if (AKT[name]) {
+    e.preventDefault();
+    try { const r = AKT[name](...p); if (r && r.catch) r.catch(fehlerZeigen); } catch (err) { fehlerZeigen(err); }
+  }
 });
 $('#sheet-zu').onclick = sheetZu; $('#sheet-bg').onclick = sheetZu; $('#sheet-back').onclick = sheetZurueck;
 document.addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; S.limit = 60; $('#erg').innerHTML = sucheErgebnis(); } });
