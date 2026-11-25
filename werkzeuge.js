@@ -94,40 +94,52 @@ function maxKaufpreis(p, ziel) {
   return lo;
 }
 // Felder: Bereich der Regler, Einheit. pct = Anteil (0,04) wird als Prozent (4) angezeigt und getippt.
+// min/max sind harte Grenzen (Regler UND getippte Zahl); ueb = üblicher Bereich als Hinweis; std = Standardwert für Nebenkosten
 const KR_DEF = {
-  kaufpreis: {l: 'Kaufpreis', u: '€', min: 50000, max: 600000, step: 5000},
-  miete_pro_zimmer: {l: 'Warmmiete pro Zimmer', u: '€', min: 300, max: 1000, step: 10},
-  eigenkapital: {l: 'Eigenkapital', u: '€', min: 0, max: 300000, step: 5000},
-  zinssatz: {l: 'Zins (Sollzins)', u: '%', pct: 1, min: 1, max: 8, step: 0.05, dez: 2},
-  tilgung: {l: 'Tilgung', u: '%', pct: 1, min: 1, max: 5, step: 0.25, dez: 2},
-  leerstand: {l: 'Leerstand', u: '%', pct: 1, min: 0, max: 15, step: 1, dez: 0},
-  hausgeld: {l: 'Hausgeld', u: '€/Monat', min: 0, max: 800, step: 10},
-  nebenkosten_monat: {l: 'Strom + Internet', u: '€/Monat', min: 0, max: 400, step: 10},
-  renovierung: {l: 'Renovierung', u: '€', min: 0, max: 100000, step: 1000},
-  moebel: {l: 'Möbel', u: '€', min: 0, max: 50000, step: 500},
-  makler_satz: {l: 'Makler (Käuferanteil)', u: '%', pct: 1, min: 0, max: 7.14, step: 0.05, dez: 2},
-  grest_satz: {l: 'Grunderwerbsteuer', u: '%', pct: 1, min: 3.5, max: 6.5, step: 0.5, dez: 1},
-  notar_satz: {l: 'Notar + Grundbuch', u: '%', pct: 1, min: 1, max: 3, step: 0.1, dez: 1},
-  grundsteuer: {l: 'Grundsteuer', u: '€/Monat', min: 0, max: 150, step: 5},
-  _ziel: {l: 'Ziel-Cashflow', u: '€/Monat', min: -500, max: 1000, step: 50},
+  kaufpreis: {l: 'Kaufpreis', u: '€', min: 30000, max: 800000, step: 5000, ueb: '100.000–400.000 €'},
+  miete_pro_zimmer: {l: 'Warmmiete pro Zimmer', u: '€', min: 250, max: 900, step: 10, ueb: '350–650 €'},
+  eigenkapital: {l: 'Eigenkapital', u: '€', min: 0, max: k => k.kaufpreis * 1.2, step: 5000, ueb: '10–30 % vom Kaufpreis'},
+  zinssatz: {l: 'Zins (Sollzins)', u: '%', pct: 1, min: 1, max: 7, step: 0.05, dez: 2, ueb: '3,0–4,5 %'},
+  tilgung: {l: 'Tilgung', u: '%', pct: 1, min: 1, max: 4, step: 0.25, dez: 2, ueb: '1,5–3 %'},
+  leerstand: {l: 'Leerstand', u: '%', pct: 1, min: 0, max: 15, step: 1, dez: 0, ueb: '3–8 %'},
+  hausgeld: {l: 'Hausgeld', u: '€/Monat', min: 0, max: 600, step: 10, ueb: '150–350 €'},
+  nebenkosten_monat: {l: 'Strom + Internet', u: '€/Monat', min: 0, max: 300, step: 10, ueb: '40–120 €'},
+  renovierung: {l: 'Renovierung', u: '€', min: 0, max: 80000, step: 1000, ueb: '0–30.000 €'},
+  moebel: {l: 'Möbel', u: '€', min: 0, max: 30000, step: 500, ueb: '1.000–1.500 € je Zimmer'},
+  makler_satz: {l: 'Makler (Käuferanteil)', u: '%', pct: 1, min: 0, max: 4, step: 0.01, dez: 2, std: 3.57, ueb: '0 % ohne Makler, sonst ca. 3,57 %'},
+  grest_satz: {l: 'Grunderwerbsteuer', u: '%', pct: 1, min: 3.5, max: 6.5, step: 0.5, dez: 1, std: 6, ueb: 'je Bundesland 3,5–6,5 %'},
+  notar_satz: {l: 'Notar + Grundbuch', u: '%', pct: 1, min: 1, max: 2.5, step: 0.1, dez: 1, std: 2, ueb: 'ca. 1,5–2 %'},
+  grundsteuer: {l: 'Grundsteuer', u: '€/Monat', min: 0, max: 100, step: 5, ueb: '10–40 €'},
+  _ziel: {l: 'Ziel-Cashflow', u: '€/Monat', min: -300, max: 800, step: 50, ueb: '0–400 €'},
 };
+const BUNDESLAENDER = {'Baden-Württemberg': 5, 'Bayern': 3.5, 'Berlin': 6, 'Brandenburg': 6.5, 'Bremen': 5.5, 'Hamburg': 5.5, 'Hessen': 6, 'Mecklenburg-Vorpommern': 6,
+  'Niedersachsen': 5, 'Nordrhein-Westfalen': 6.5, 'Rheinland-Pfalz': 5, 'Saarland': 6.5, 'Sachsen': 5.5, 'Sachsen-Anhalt': 5, 'Schleswig-Holstein': 6.5, 'Thüringen': 5};
 let KR = null, KRT = 'eingabe';
+const krGrenzen = k => { const d = KR_DEF[k], mx = typeof d.max === 'function' ? d.max(KR) : d.max; return [d.min, mx]; };
+const krBegrenzen = (k, v) => { const [mn, mx] = krGrenzen(k), d = KR_DEF[k], skala = d.pct ? 100 : 1; return Math.max(mn / skala, Math.min(mx / skala, v)); };
 function krStart(zuruecksetzen) {
   let gespeichert = null;
-  if (zuruecksetzen) { try { localStorage.removeItem('fin_kr2'); } catch (e) { /* ok */ } }
-  else { try { gespeichert = JSON.parse(localStorage.getItem('fin_kr2')); } catch (e) { /* ok */ } }
+  if (zuruecksetzen) { try { localStorage.removeItem('fin_kr3'); } catch (e) { /* ok */ } }
+  else { try { gespeichert = JSON.parse(localStorage.getItem('fin_kr3')); } catch (e) { /* ok */ } }
   KR = {...D.kauf, _ziel: 300, ...(gespeichert || {})};
+  if (!gespeichert) {                                     // Standardwerte für die Kaufnebenkosten; Makler nur, wenn die Startwerte keinen eigenen haben
+    KR.grest_satz = KR.grest_satz || KR_DEF.grest_satz.std / 100;
+    KR.notar_satz = KR.notar_satz || KR_DEF.notar_satz.std / 100;
+    if (!KR.makler_satz) KR.makler_satz = KR_DEF.makler_satz.std / 100;
+  }
+  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || 1)));
+  for (const k of Object.keys(KR_DEF)) if (typeof KR[k] === 'number') KR[k] = krBegrenzen(k, KR[k]);   // alte oder fremde Werte in den sinnvollen Bereich holen
 }
 const krWert = k => KR_DEF[k].pct ? KR[k] * 100 : KR[k];
 const krFormat = k => { const d = KR_DEF[k], v = krWert(k); return d.pct ? v.toFixed(d.dez).replace('.', ',') : nf0.format(v); };
 const krRoh = k => { const d = KR_DEF[k], v = krWert(k); return String(d.pct ? +v.toFixed(d.dez) : Math.round(v * 100) / 100).replace('.', ','); };
 
 function krFeld(k) {
-  const d = KR_DEF[k], v = krWert(k), mx = Math.max(d.max, v * 1.25), mn = Math.min(d.min, v);
-  return `<div class="kr-f"><div class="kr-z"><span>${d.l}</span><label class="kr-i"><input class="kr-n" data-kr="${k}" inputmode="decimal" value="${krFormat(k)}" autocomplete="off" aria-label="${d.l}"><em>${d.u}</em></label></div>` +
+  const d = KR_DEF[k], v = krWert(k), [mn, mx] = krGrenzen(k);
+  return `<div class="kr-f"><div class="kr-z"><span>${d.l}${d.ueb ? `<small class="kr-ueb">üblich: ${d.ueb}</small>` : ''}</span><label class="kr-i"><input class="kr-n" data-kr="${k}" inputmode="decimal" value="${krFormat(k)}" autocomplete="off" aria-label="${d.l}"><em>${d.u}</em></label></div>` +
     `<input class="kr-r" type="range" data-kr="${k}" min="${mn}" max="${mx}" step="${d.step}" value="${v}" aria-label="${d.l} Regler"></div>`;
 }
-const krZimmer = () => `<div class="kr-f"><div class="kr-z"><span>Zimmer</span><div class="kr-st"><button type="button" data-a="kr_step|zimmer|-1" aria-label="weniger">−</button><b id="kr_zimmer">${KR.zimmer}</b><button type="button" data-a="kr_step|zimmer|1" aria-label="mehr">+</button></div></div></div>`;
+const krZimmer = () => `<div class="kr-f"><div class="kr-z"><span>Zimmer</span><div class="kr-st"><button type="button" data-kr-step="-1" aria-label="weniger">−</button><b id="kr_zimmer">${KR.zimmer}</b><button type="button" data-kr-step="1" aria-label="mehr">+</button></div></div></div>`;
 
 function kurve(p) {
   const W = 340, H = 196, pl = 8, pr = 8, pt = 22, pb = 24, pts = [], max = maxKaufpreis(p, p._ziel);
@@ -160,7 +172,7 @@ function krKopf() {
   const farbe = ok ? 'gruen' : knapp ? 'orange' : 'rot', text = ok ? 'Rechnet sich' : knapp ? 'Knapp' : 'Zu teuer';
   $('#kr_kopf').innerHTML = `<div class="kr-zeile"><div><div class="kr-gross ${ton(r.cashflow)}">${eur(r.cashflow)}</div><div class="kr-sub">Cashflow pro Monat vor Steuern</div></div>` +
     `<div class="kr-urteil"><span class="chip" style="background:color-mix(in srgb,var(--${farbe}) 20%,transparent);color:var(--${farbe === 'gruen' ? 'gut' : farbe === 'rot' ? 'schlecht' : 'orange'})">${text}</span>` +
-    `<div class="kr-sub">fürs Ziel max. ${eur(max)}</div></div></div>`;
+    `<div class="kr-sub">fürs Ziel max. ${eur(max)}</div></div></div>` + krHinweisHtml(krHinweise(KR, r).slice(0, 1));
   if (KRT === 'ergebnis') krBody();
 }
 function krBody() {
@@ -169,7 +181,10 @@ function krBody() {
     el.innerHTML = `<h3>Wohnung</h3><div class="karte">${krFeld('kaufpreis')}${krZimmer()}${krFeld('miete_pro_zimmer')}</div>` +
       `<h3>Finanzierung</h3><div class="karte">${krFeld('eigenkapital')}${krFeld('zinssatz')}${krFeld('tilgung')}</div>` +
       `<h3>Kosten & Risiko</h3><div class="karte">${krFeld('hausgeld')}${krFeld('nebenkosten_monat')}${krFeld('renovierung')}${krFeld('moebel')}${krFeld('leerstand')}</div>` +
-      `<details class="karte kr-mehr"><summary>Weitere Annahmen</summary>${['makler_satz', 'grest_satz', 'notar_satz', 'grundsteuer', '_ziel'].map(krFeld).join('')}</details>` +
+      `<h3>Kaufnebenkosten <small>schon voreingestellt</small></h3><div class="karte"><div class="kr-f"><div class="kr-z"><span>Bundesland <small class="kr-ueb">bestimmt die Grunderwerbsteuer</small></span>` +
+      `<select class="feld kr-bl" id="kr_bl" aria-label="Bundesland"><option value="">–</option>${Object.keys(BUNDESLAENDER).map(b => `<option${KR.bl === b ? ' selected' : ''}>${b}</option>`).join('')}</select></div></div>` +
+      `${krFeld('grest_satz')}${krFeld('makler_satz')}${krFeld('notar_satz')}<div class="klein" id="kr_nk"></div></div>` +
+      `<details class="karte kr-mehr"><summary>Weitere Annahmen</summary>${['grundsteuer', '_ziel'].map(krFeld).join('')}</details>` +
       `<div class="klein">Tipp: Zahl antippen und direkt tippen, oder den Regler ziehen. Oben siehst du sofort, was es bewirkt.</div>` +
       `<button class="knopf hell" data-a="kr_zurueck">Auf meine Startwerte zurücksetzen</button>`;
     return;
@@ -185,10 +200,41 @@ function krBody() {
     `<h3>Kennzahlen</h3><div class="karte">${kv('Nach Steuern (ca.)', eur(r.cfNach))}${kv('Rate pro Monat', eur(r.rate))}${kv('Kaufnebenkosten', eur(r.nk))}${kv('Bruttorendite', pct(r.brutto, 1))}${kv('Nettorendite', pct(r.netto, 1))}` +
     `${kv('Kaufpreisfaktor', r.faktor.toFixed(1).replace('.', ','))}${kv('EK-Rendite inkl. Tilgung', pct(r.ek, 1))}</div>`;
 }
+// Zimmer +/−: reagiert schon beim Antippen (pointerdown) und lässt Tastatur/Fokus in Ruhe – sonst verschluckt iOS den ersten Tipp
+function krZimmerAendern(d) {
+  if (!KR) return;
+  KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || 1) + d));
+  const z = $('#kr_zimmer'); if (z) z.textContent = KR.zimmer;
+  document.querySelectorAll('[data-kr-step]').forEach(b => { b.disabled = (+b.dataset.krStep < 0 && KR.zimmer <= 1) || (+b.dataset.krStep > 0 && KR.zimmer >= 10); });
+  try { localStorage.setItem('fin_kr3', JSON.stringify(KR)); } catch (e) { /* ok */ }
+  krKopf();
+}
+let KR_ZEIT = 0;
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('[data-kr-step]'); if (!b || b.disabled) return;
+  e.preventDefault(); KR_ZEIT = Date.now(); krZimmerAendern(+b.dataset.krStep);
+});
+document.addEventListener('click', e => {                                  // Tastatur/Screenreader (kein pointerdown davor)
+  const b = e.target.closest && e.target.closest('[data-kr-step]'); if (!b || b.disabled || Date.now() - KR_ZEIT < 700) return;
+  krZimmerAendern(+b.dataset.krStep);
+});
+
+// Plausibilitäts-Hinweise zur Finanzierung
+function krHinweise(p, r) {
+  const h = [], beleih = p.kaufpreis ? r.darlehen / (p.kaufpreis + p.renovierung) : 0;
+  if (p.eigenkapital < r.nk) h.push(['warn', `Dein Eigenkapital (${eur(p.eigenkapital)}) deckt nicht mal die Kaufnebenkosten (${eur(r.nk)}). Banken verlangen meist mindestens diese als Eigenkapital.`]);
+  if (beleih > 1) h.push(['warn', `Das Darlehen liegt über dem Kaufpreis (${Math.round(beleih * 100)} %). Das finanzieren Banken kaum.`]);
+  else if (beleih > 0.9) h.push(['info', `Fast 100 % finanziert (${Math.round(beleih * 100)} %): Die Bank verlangt dann oft einen höheren Zins.`]);
+  if (r.rate > 0 && r.ein - r.kosten < r.rate * 1.1) h.push(['warn', `Die Mieteinnahmen nach Kosten (${eur(r.ein - r.kosten)}) tragen die Kreditrate (${eur(r.rate)}) nur knapp oder gar nicht.`]);
+  if (p.eigenkapital > r.gesamt) h.push(['info', 'Mit diesem Eigenkapital brauchst du gar kein Darlehen.']);
+  if (r.brutto > 0 && r.brutto < 0.04) h.push(['info', `Bruttorendite nur ${pct(r.brutto, 1)} – üblich sind 4–7 %.`]);
+  return h;
+}
+const krHinweisHtml = h => h.map(([t, x]) => `<div class="kr-hint ${t}">${t === 'warn' ? '⚠︎' : 'ℹ︎'} ${esc(x)}</div>`).join('');
 function sheetKauf() {
   krStart(false); KRT = 'eingabe';
   sheet('Wohnungs-Check', `<div class="kr-sticky"><div id="kr_kopf"></div><div class="seg" id="kr_seg"><button class="an" data-a="kr_tab|eingabe">Eingabe</button><button data-a="kr_tab|ergebnis">Ergebnis</button></div></div><div id="kr_body"></div>`);
-  krKopf(); krBody();
+  krKopf(); krBody(); krNebenInfo();
 }
 // Eingabe: Regler und Zahlfeld bleiben synchron; beim Antippen wird die Zahl markiert (sofort überschreibbar)
 document.addEventListener('input', e => {
@@ -196,16 +242,38 @@ document.addEventListener('input', e => {
   const d = KR_DEF[k], el = e.target; let v;
   if (el.type === 'range') v = parseFloat(el.value);
   else { const n = zahlAusText(el.value.replace(/\s/g, '')); if (n == null) return; v = n; }
-  KR[k] = d.pct ? v / 100 : v;
-  document.querySelectorAll(`[data-kr="${k}"]`).forEach(o => { if (o !== el) o.value = o.type === 'range' ? v : krFormat(k); });
-  try { localStorage.setItem('fin_kr2', JSON.stringify(KR)); } catch (err) { /* ok */ }
+  KR[k] = krBegrenzen(k, d.pct ? v / 100 : v);                      // nie außerhalb des sinnvollen Bereichs rechnen
+  document.querySelectorAll(`[data-kr="${k}"]`).forEach(o => { if (o !== el) o.value = o.type === 'range' ? krWert(k) : krFormat(k); });
+  if (k === 'kaufpreis') { const r = document.querySelector('input[type=range][data-kr="eigenkapital"]'); if (r) { r.max = krGrenzen('eigenkapital')[1]; if (KR.eigenkapital > +r.max) KR.eigenkapital = +r.max; } }
+  krNebenInfo();
+  try { localStorage.setItem('fin_kr3', JSON.stringify(KR)); } catch (err) { /* ok */ }
   krKopf();
 });
 document.addEventListener('focusin', e => {
   if (!(e.target.classList && e.target.classList.contains('kr-n'))) return;
   const el = e.target; setTimeout(() => { el.value = krRoh(el.dataset.kr); el.select(); }, 0);
 });
-document.addEventListener('focusout', e => { if (e.target.classList && e.target.classList.contains('kr-n') && KR) e.target.value = krFormat(e.target.dataset.kr); });
+document.addEventListener('focusout', e => {
+  if (!(e.target.classList && e.target.classList.contains('kr-n') && KR)) return;
+  const k = e.target.dataset.kr, d = KR_DEF[k], roh = zahlAusText(e.target.value.replace(/\s/g, ''));
+  if (roh != null) { const [mn, mx] = krGrenzen(k); if (roh < mn || roh > mx) toast(`${d.l}: erlaubt sind ${nf0.format(mn)}–${nf0.format(mx)} ${d.u.replace('€/Monat', '€')}`); }
+  e.target.value = krFormat(k);
+});
+document.addEventListener('change', e => {
+  if (!(e.target.id === 'kr_bl' && KR)) return;
+  KR.bl = e.target.value;
+  if (BUNDESLAENDER[KR.bl] != null) {
+    KR.grest_satz = BUNDESLAENDER[KR.bl] / 100;
+    document.querySelectorAll('[data-kr="grest_satz"]').forEach(o => { o.value = o.type === 'range' ? krWert('grest_satz') : krFormat('grest_satz'); });
+  }
+  try { localStorage.setItem('fin_kr3', JSON.stringify(KR)); } catch (err) { /* ok */ }
+  krNebenInfo(); krKopf();
+});
+function krNebenInfo() {
+  const el = $('#kr_nk'); if (!el || !KR) return;
+  const s = KR.grest_satz + KR.makler_satz + KR.notar_satz;
+  el.textContent = `Zusammen ${(s * 100).toFixed(2).replace('.', ',')} % vom Kaufpreis = ${eur(KR.kaufpreis * s)}`;
+}
 
 function werkzeugeHtml() {
   return `<h3>Werkzeuge</h3>` + liste([
@@ -219,7 +287,7 @@ function werkzeugeHtml() {
 Object.assign(AKT, {
   kauf: sheetKauf, spielraum: sheetSpielraum, freiheit: sheetFreiheit, bericht: sheetBericht, erinnerung: sheetErinnerung,
   teilen_text: id => teilen(wert(id), 'Finanzen'), kopieren_text: id => kopieren(wert(id)),
-  kr_zurueck: () => { krStart(true); krBody(); krKopf(); toast('Startwerte wiederhergestellt'); },
+  kr_zurueck: () => { krStart(true); krBody(); krNebenInfo(); krKopf(); toast('Startwerte wiederhergestellt'); },
   kr_tab: k => { KRT = k; document.querySelectorAll('#kr_seg button').forEach(b => b.classList.toggle('an', b.dataset.a === 'kr_tab|' + k)); krBody(); $('#sheet-inhalt').scrollTop = 0; },
-  kr_step: (k, d) => { KR[k] = Math.max(1, Math.min(12, KR[k] + (+d))); const z = $('#kr_zimmer'); if (z) z.textContent = KR[k]; try { localStorage.setItem('fin_kr2', JSON.stringify(KR)); } catch (e) { /* ok */ } krKopf(); },
+  kr_step: (k, d) => krZimmerAendern(+d),
 });

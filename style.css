@@ -194,3 +194,9 @@ select.feld { appearance: none; -webkit-appearance: none; background-image: line
 .kv { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; font-size: .92rem; }
 .kv + .kv { border-top: 1px solid var(--linie); }
 .kv span:first-child { color: var(--text2); } .kv span:last-child { text-align: right; font-weight: 500; }
+
+.kr-ueb { display: block; font-size: .72rem; color: var(--text2); font-weight: 400; margin-top: 1px; }
+.kr-bl { width: auto; max-width: 11em; padding: 6px 8px; }
+.kr-hint { font-size: .8rem; padding: 7px 10px; border-radius: 10px; margin-top: 6px; background: var(--fuell); color: var(--text2); }
+.kr-hint.warn { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--text); }
+.kr-st button:disabled { opacity: .35; }
