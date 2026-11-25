@@ -85,12 +85,28 @@ const DB = {
 
 // ====================================================================== Entschlüsseln (WebCrypto, AES-256-GCM)
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-async function entschluesseln(datei, pw) {
+function b64enc(buf) {                                   // Bytes -> Base64 (in Stücken, damit große Dateien nicht abstürzen)
+  const a = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// Das Passwort wird nur EINMAL abgefragt: daraus wird ein Schlüssel abgeleitet (nicht auslesbar) und auf dem Gerät gemerkt.
+// Neue Dateien vom PC (gleiches Passwort) öffnen sich damit von selbst.
+async function schluesselAus(datei, pw) {
   const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: b64(datei.salt), iterations: datei.iter, hash: 'SHA-256'},
-    km, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+  return crypto.subtle.deriveKey({name: 'PBKDF2', salt: b64(datei.salt), iterations: datei.iter, hash: 'SHA-256'},
+    km, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+}
+async function entschluesselnMit(datei, key) {
   const klar = await crypto.subtle.decrypt({name: 'AES-GCM', iv: b64(datei.iv)}, key, b64(datei.data));
   return JSON.parse(new TextDecoder().decode(klar));
+}
+async function schluesselMerken(datei, key) {
+  S.key = key; S.keySalt = datei.salt; S.keyIter = datei.iter;
+  try { await DB.set('schluessel', {salt: datei.salt, iter: datei.iter, key}); } catch (e) { /* Gerät kann es nicht speichern -> Passwort wird dann öfter gefragt */ }
+}
+async function schluesselLaden() {
+  try { const s = await DB.get('schluessel'); if (s && s.key) { S.key = s.key; S.keySalt = s.salt; S.keyIter = s.iter; } } catch (e) { /* ignorieren */ }
 }
 
 // ====================================================================== Zustand
@@ -229,6 +245,7 @@ function cockpit() {
     kachel('s_mieten', `Mieten ${D.monat.slice(5)}/${D.monat.slice(0, 4)}`, eur(m.ist), `von ${eur(m.soll)} Soll · ${m.offen ? m.offen + ' offen' : 'alles da'}`, m.offen ? 'schlecht' : 'gut') +
     kachel('s_check', 'Monats-Check', `${ck.erledigt} / ${ck.gesamt}`, ck.erledigt === ck.gesamt ? 'erledigt' : `${ck.gesamt - ck.erledigt} Punkte offen`, ck.erledigt === ck.gesamt ? 'gut' : '') +
     `</div>` +
+    `<div class="werkzeuge">${[['spielraum', 'Spielraum'], ['freiheit', 'Freiheit'], ['kauf', 'Wohnungs-Check'], ['bericht', 'Bericht']].map(([a, l]) => `<button data-a="${a}">${l}</button>`).join('')}</div>` +
     `<h3>Wichtig</h3>` + liste(c.wichtig.slice(0, 6).map((w, i) => zeile({
       punkt: w.stufe === 'fehler' ? 'var(--rot)' : w.stufe === 'warnung' ? 'var(--orange)' : 'var(--blau)', akt: `s_wichtig|${i}`,
       titel: esc(w.titel), unter: esc((w.text || '').slice(0, 90)), rechts: w.betrag ? eur(w.betrag) : null})).concat(
@@ -394,7 +411,7 @@ function suche() {
 function mehr() {
   const gesp = S.gesp && S.gesp.modus === 'gesperrt', t = D.termine;
   const gr = {}; t.forEach(x => (gr[x.datum.slice(0, 7)] = gr[x.datum.slice(0, 7)] || []).push(x));
-  return kopf('Mehr', 'Termine & Daten') +
+  return kopf('Mehr', 'Mehr') + werkzeugeHtml() + erfassungenHtml() +
     `<h3>Termine & Fristen</h3>` + Object.entries(gr).map(([m, ts]) => `<div class="klein" style="margin-top:12px"><b>${mLang(m)}</b></div>` +
       liste(ts.map(x => zeile({punkt: ARTEN[x.art] || 'var(--grau)', titel: esc(x.titel), unter: esc(x.detail), rechts: dKurz(x.datum), fett: false})))).join('') +
     `<h3>Daten auf diesem Handy</h3><div class="karte">${kv('Stand', dDe(D.stand) + ' ' + D.stand.slice(11))}${kv('Buchungen', nf0.format(D.buchungen.length))}` +
@@ -455,7 +472,7 @@ function sheetMieter(id) {
     `${kv('Mietbeginn', dDe(v.von))}${kv('Mietende', v.bis ? dDe(v.bis) : 'unbefristet')}` +
     `${kv('Zahler', v.zahler.map(z => esc(z.name) + ' ' + eur(z.betrag)).join('<br>') || '–')}` +
     `${kv('Kaution', eur(v.kaution_erhalten) + ' erhalten' + (v.kaution && v.kaution !== v.kaution_erhalten ? ' (vereinbart ' + eur(v.kaution) + ')' : ''))}` +
-    `${v.kanal ? kv('Kanal', esc(v.kanal)) : ''}${v.notiz ? kv('Notiz', esc(v.notiz)) : ''}</div>`);
+    `${v.kanal ? kv('Kanal', esc(v.kanal)) : ''}${v.notiz ? kv('Notiz', esc(v.notiz)) : ''}</div>` + mieterAktionen(v));
 }
 function sheetCf() {
   const V = D.vermietung, j = V.cashflow[0];
@@ -520,10 +537,13 @@ const AKT = {
   p_ein: () => sheetPriv('e', S.pm), p_aus: () => sheetPriv('a', S.pm), p_saldo: () => sheetSaldo(S.pm), p_quote: () => sheetQuote(S.pm),
   s_pmonat: m => { S.pm = m; render(); sheetSaldo(m); },
   s_kat: (m, art, k) => sheetKat(m, art, k),
-  schutz_an: async () => { S.gesp = {modus: 'gesperrt', datei: S.datei}; await DB.set('daten', S.gesp); toast('Ab jetzt mit Passwort'); render(); },
+  schutz_an: async () => { S.gesp = {modus: 'gesperrt', datei: S.datei}; await DB.set('daten', S.gesp); await DB.del('schluessel'); toast('Ab jetzt mit Passwort'); render(); },
   schutz_aus: () => zeigePasswort(S.datei, '', 'offen'),
-  loeschen: async () => { if (!confirm('Alle Daten von diesem Handy löschen? Du kannst sie jederzeit mit der Datei neu laden.')) return;
-    await DB.del('daten'); D = null; S.gesp = null; S.datei = null; zeigeWillkommen(); },
+  loeschen: async () => {
+    const offen = (typeof ERF !== 'undefined' ? ERF : []).filter(e => !e.gesendet).length;
+    if (!confirm((offen ? `ACHTUNG: ${offen} erfasste Einträge sind noch nicht an den PC gesendet und gehen verloren.\n\n` : '') + 'Alle Daten von diesem Handy löschen? Du kannst sie jederzeit mit der Datei neu laden.')) return;
+    await DB.del('daten'); await DB.del('schluessel'); await DB.del('erfassungen');
+    D = null; S.gesp = null; S.datei = null; S.key = null; if (typeof ERF !== 'undefined') ERF = []; zeigeWillkommen(); },
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
@@ -532,7 +552,9 @@ document.addEventListener('click', e => {
 });
 $('#sheet-zu').onclick = sheetZu; $('#sheet-bg').onclick = sheetZu; $('#sheet-back').onclick = sheetZurueck;
 document.addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; S.limit = 60; $('#erg').innerHTML = sucheErgebnis(); } });
-document.addEventListener('change', e => { if (e.target.type === 'file' && e.target.files[0]) dateiGewaehlt(e.target.files[0]); });
+document.addEventListener('change', e => {
+  if (e.target.type === 'file' && ['datei', 'datei2'].includes(e.target.id) && e.target.files[0]) { dateiGewaehlt(e.target.files[0]); e.target.value = ''; }
+});
 
 // ====================================================================== Start, Laden, Entsperren
 const ICONS = {
@@ -549,23 +571,39 @@ function render() {
   catch (e) { $('#app').innerHTML = `<div class="karte"><b>Anzeige-Fehler</b><div class="klein">${esc(e.message)}<br>Bitte die Datei neu laden (Mehr → Neue Daten laden).</div></div>`; console.error(e); }
   $('#tabs').innerHTML = TABS.map(([k, l]) => `<button class="${S.tab === k ? 'an' : ''}" data-a="tab|${k}">${ICONS[k]}${l}</button>`).join('');
 }
-function zeigeApp() { $('#tabs').hidden = false; render(); }
+function zeigeApp() { $('#tabs').hidden = false; $('#fab').hidden = false; render(); }
 function zeigeWillkommen(hinweis = '') {
-  $('#tabs').hidden = true;
+  $('#tabs').hidden = true; $('#fab').hidden = true;
   $('#app').innerHTML = `<div class="willkommen"><img class="logo" src="icons/icon-192.png" alt=""><h1>Finanzen</h1>` +
     `<p>Deine Vermietung und privaten Finanzen – offline und nur auf diesem Handy.<br>Lade die Datei, die du am PC unter <b>Einstellungen → Handy</b> erstellt hast.</p>` +
     `<label class="knopf">Datei auswählen<input type="file" id="datei" hidden></label><div class="hinweis-fehler">${esc(hinweis)}</div>` +
     `<p class="klein">Die Datei ist verschlüsselt und wird nur hier auf dem Gerät geöffnet. Es werden keine Daten ins Internet gesendet.</p></div>`;
 }
 async function dateiGewaehlt(file) {
+  let datei;
   try {
-    const datei = JSON.parse(await file.text());
+    datei = JSON.parse(await file.text());
     if (!datei.fin || !datei.salt || !datei.data) throw new Error('keine Finanzen-Datei');
-    zeigePasswort(datei, '', 'neu');
-  } catch (e) { toast('Das ist keine gültige Finanzen-Datei'); if (!D) zeigeWillkommen('Das ist keine gültige Finanzen-Datei.'); }
+  } catch (e) { toast('Das ist keine gültige Finanzen-Datei'); if (!D) zeigeWillkommen('Das ist keine gültige Finanzen-Datei.'); return; }
+  if (datei.typ === 'erfassungen') { toast('Das ist eine Erfassungs-Datei – die gehört an den PC'); return; }
+  if (S.key && S.keySalt === datei.salt) {              // gleiches Passwort wie beim ersten Mal -> ohne Eingabe öffnen
+    try {
+      const daten = await entschluesselnMit(datei, S.key);
+      await datenUebernehmen(datei, daten, S.gesp && S.gesp.modus === 'gesperrt');
+      toast('Daten aktualisiert'); return;
+    } catch (e) { /* Schlüssel passt nicht -> Passwort abfragen */ }
+  }
+  zeigePasswort(datei, '', 'neu');
+}
+async function datenUebernehmen(datei, daten, immer) {
+  S.datei = datei; D = daten;
+  S.gesp = immer ? {modus: 'gesperrt', datei} : {modus: 'offen', daten, datei};
+  await DB.set('daten', S.gesp);
+  if (immer) { try { await DB.del('schluessel'); } catch (e) { /* ok */ } }
+  S.pm = null; zeigeApp();
 }
 function zeigePasswort(datei, fehler = '', modus = 'neu') {
-  $('#tabs').hidden = true;
+  $('#tabs').hidden = true; $('#fab').hidden = true;
   const entsperren = modus === 'entsperren';
   $('#app').innerHTML = `<div class="willkommen"><img class="logo" src="icons/icon-192.png" alt=""><h1>${entsperren ? 'Entsperren' : 'Passwort'}</h1>` +
     `<p>${entsperren ? 'Gib dein Passwort ein, um die Finanzen zu öffnen.' : `Datei vom ${dDe(datei.stand || '')}. Gib das Passwort ein, das du am PC vergeben hast.`}</p>` +
@@ -578,9 +616,11 @@ function zeigePasswort(datei, fehler = '', modus = 'neu') {
     ev.preventDefault(); const pw = $('#pw').value; if (!pw) return;
     $('#pwfehler').textContent = 'Wird geöffnet …';
     try {
-      const daten = await entschluesseln(datei, pw);
+      const key = await schluesselAus(datei, pw);
+      const daten = await entschluesselnMit(datei, key);
+      const immer = modus === 'entsperren' ? true : modus === 'offen' ? false : !!($('#immer') && $('#immer').checked);
+      if (immer) { S.key = key; S.keySalt = datei.salt; S.keyIter = datei.iter; } else await schluesselMerken(datei, key);
       S.datei = datei; D = daten;
-      const immer = modus === 'entsperren' ? true : modus === 'offen' ? false : $('#immer').checked;
       S.gesp = immer ? {modus: 'gesperrt', datei} : {modus: 'offen', daten, datei};
       await DB.set('daten', S.gesp);
       if (modus === 'neu') { S.pm = null; S.tab = 'cockpit'; }
@@ -596,8 +636,10 @@ async function start() {
   }
   const gesp = await DB.get('daten'); S.gesp = gesp || null;
   if (gesp) S.datei = gesp.datei || null;
+  await schluesselLaden();
+  if (typeof erfassungenLaden === 'function') await erfassungenLaden();
   if (gesp && gesp.modus === 'offen' && gesp.daten) { D = gesp.daten; zeigeApp(); }
   else if (gesp && gesp.datei) zeigePasswort(gesp.datei, '', 'entsperren');
   else zeigeWillkommen();
 }
-start();
+window.addEventListener('DOMContentLoaded', start);       // erst starten, wenn alle Skripte geladen sind

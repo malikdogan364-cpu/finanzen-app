@@ -119,6 +119,31 @@ button.hb:active { opacity: .6; }
 .legende i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .legende span { flex: 1; } .legende em { font-style: normal; color: var(--text2); }
 
+/* Plus-Knopf, Werkzeug-Leiste, Formulare */
+#fab { position: fixed; right: 18px; bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 16px); width: 56px; height: 56px; z-index: 30;
+       border-radius: 50%; background: var(--blau); color: #fff; font-size: 2rem; line-height: 54px; text-align: center; font-weight: 300;
+       box-shadow: 0 6px 20px rgba(10,132,255,.45); }
+#fab:active { transform: scale(.92); }
+.werkzeuge { display: flex; gap: 8px; margin: 12px 0 2px; overflow-x: auto; scrollbar-width: none; }
+.werkzeuge button { flex: none; background: var(--karte); border-radius: 999px; padding: 8px 15px; font-size: .86rem; font-weight: 500;
+                    box-shadow: var(--schatten); color: var(--blau); }
+.form { display: block; }
+.fl { display: block; margin: 12px 0 0; }
+.fl > span { display: block; font-size: .8rem; color: var(--text2); margin: 0 2px 2px; }
+.fl .seg { margin: 2px 0 0; }
+.drei { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.drei .feld { margin-top: 0; }
+textarea.feld { resize: vertical; font-family: inherit; }
+select.feld { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text2) 50%), linear-gradient(135deg, var(--text2) 50%, transparent 50%); background-position: calc(100% - 19px) 55%, calc(100% - 13px) 55%; background-size: 6px 6px; background-repeat: no-repeat; }
+.fotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; }
+.foto { position: relative; width: 74px; height: 74px; }
+.foto img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.foto button { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--text); color: var(--bg); font-size: .7rem; text-align: center; line-height: 22px; }
+#f_sig { width: 100%; height: 130px; background: #fff; border: 1px solid var(--linie); border-radius: 12px; touch-action: none; display: block; }
+.lnk { color: var(--blau); font-size: .8rem; margin-left: 6px; }
+.kr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.kr-grid .fl { margin-top: 10px; }
+
 /* Suche */
 .suche { display: flex; gap: 8px; align-items: center; background: var(--fuell); border-radius: 12px; padding: 0 12px; margin-bottom: 10px; }
 .suche input { flex: 1; background: none; border: 0; outline: 0; padding: 11px 0; font-size: 1rem; min-width: 0; }
