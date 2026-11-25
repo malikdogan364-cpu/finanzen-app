@@ -1,5 +1,5 @@
 /* Service Worker: legt die App (nur Code, keine Daten) im Zwischenspeicher ab, damit sie offline startet. */
-const VERSION = 'finanzen-v7';        // bei jeder Änderung an der App hochzählen, dann lädt sich die App selbst neu
+const VERSION = 'finanzen-v8';        // bei jeder Änderung an der App hochzählen, dann lädt sich die App selbst neu
 const DATEIEN = ['./', 'index.html', 'style.css', 'app.js', 'erfassen.js', 'werkzeuge.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 

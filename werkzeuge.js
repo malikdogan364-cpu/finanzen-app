@@ -93,24 +93,28 @@ function maxKaufpreis(p, ziel) {
   for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (kaufrechnen({...p, kaufpreis: m}).cashflow >= ziel) lo = m; else hi = m; }
   return lo;
 }
-// Felder: Bereich der Regler, Einheit. pct = Anteil (0,04) wird als Prozent (4) angezeigt und getippt.
-// min/max sind harte Grenzen (Regler UND getippte Zahl); ueb = üblicher Bereich als Hinweis; std = Standardwert für Nebenkosten
+// Felder: pct = Anteil (0,04) wird als Prozent (4) angezeigt und getippt.
+// min/max sind harte Grenzen (Regler UND getippte Zahl); ueb = üblicher Bereich als Hinweis; std = Standardwert
 const KR_DEF = {
   kaufpreis: {l: 'Kaufpreis', u: '€', min: 30000, max: 800000, step: 5000, ueb: '100.000–400.000 €'},
   miete_pro_zimmer: {l: 'Warmmiete pro Zimmer', u: '€', min: 250, max: 900, step: 10, ueb: '350–650 €'},
-  eigenkapital: {l: 'Eigenkapital', u: '€', min: 0, max: k => k.kaufpreis * 1.2, step: 5000, ueb: '10–30 % vom Kaufpreis'},
+  eigenkapital: {l: 'Eigenkapital', u: '€', min: 0, max: k => Math.round(k.kaufpreis * 1.2 / 5000) * 5000, step: 5000, ueb: 'mind. die Kaufnebenkosten'},
   zinssatz: {l: 'Zins (Sollzins)', u: '%', pct: 1, min: 1, max: 7, step: 0.05, dez: 2, ueb: '3,0–4,5 %'},
   tilgung: {l: 'Tilgung', u: '%', pct: 1, min: 1, max: 4, step: 0.25, dez: 2, ueb: '1,5–3 %'},
   leerstand: {l: 'Leerstand', u: '%', pct: 1, min: 0, max: 15, step: 1, dez: 0, ueb: '3–8 %'},
   hausgeld: {l: 'Hausgeld', u: '€/Monat', min: 0, max: 600, step: 10, ueb: '150–350 €'},
-  nebenkosten_monat: {l: 'Strom + Internet', u: '€/Monat', min: 0, max: 300, step: 10, ueb: '40–120 €'},
+  nebenkosten_monat: {l: 'Strom, Internet & Co.', u: '€/Monat', min: 0, max: 300, step: 10, ueb: '40–150 € (zahlst du bei WG-Zimmern)'},
   renovierung: {l: 'Renovierung', u: '€', min: 0, max: 80000, step: 1000, ueb: '0–30.000 €'},
-  moebel: {l: 'Möbel', u: '€', min: 0, max: 30000, step: 500, ueb: '1.000–1.500 € je Zimmer'},
-  makler_satz: {l: 'Makler (Käuferanteil)', u: '%', pct: 1, min: 0, max: 4, step: 0.01, dez: 2, std: 3.57, ueb: '0 % ohne Makler, sonst ca. 3,57 %'},
-  grest_satz: {l: 'Grunderwerbsteuer', u: '%', pct: 1, min: 3.5, max: 6.5, step: 0.5, dez: 1, std: 6, ueb: 'je Bundesland 3,5–6,5 %'},
+  moebel: {l: 'Möbel', u: '€', min: 0, max: 30000, step: 500, ueb: '1.000–2.000 € je Zimmer'},
+  makler_satz: {l: 'Makler (Käuferanteil)', u: '%', pct: 1, min: 0, max: 4, step: 0.01, dez: 2, std: 3.57, ueb: '0 % ohne Makler, sonst 3,57 %'},
+  grest_satz: {l: 'Grunderwerbsteuer', u: '%', pct: 1, min: 3.5, max: 6.5, step: 0.5, dez: 1, std: 6, ueb: 'je nach Bundesland'},
   notar_satz: {l: 'Notar + Grundbuch', u: '%', pct: 1, min: 1, max: 2.5, step: 0.1, dez: 1, std: 2, ueb: 'ca. 1,5–2 %'},
-  grundsteuer: {l: 'Grundsteuer', u: '€/Monat', min: 0, max: 100, step: 5, ueb: '10–40 €'},
-  _ziel: {l: 'Ziel-Cashflow', u: '€/Monat', min: -300, max: 800, step: 50, ueb: '0–400 €'},
+  grundsteuer: {l: 'Grundsteuer', u: '€/Monat', min: 0, max: 100, step: 5, std: 20, ueb: '10–40 €'},
+  sonstige_einnahmen: {l: 'Sonstige Einnahmen', u: '€/Monat', min: 0, max: 300, step: 10, std: 0, ueb: 'z. B. Stellplatz, Keller'},
+  steuersatz: {l: 'Dein Steuersatz', u: '%', pct: 1, min: 0, max: 45, step: 1, dez: 0, std: 30, ueb: 'Grenzsteuersatz, meist 25–42 %'},
+  gebaeudeanteil: {l: 'Gebäudeanteil', u: '%', pct: 1, min: 50, max: 90, step: 5, dez: 0, std: 75, ueb: '70–80 % (Rest ist Grundstück)'},
+  afa_satz: {l: 'Abschreibung (AfA)', u: '%', pct: 1, min: 2, max: 3, step: 0.5, dez: 1, std: 2, ueb: '2 %, Neubau ab 2023: 3 %'},
+  _ziel: {l: 'Dein Ziel', u: '€/Monat', min: 0, max: 800, step: 25, std: 300, ueb: 'so viel soll nach der Rate übrig bleiben'},
 };
 const BUNDESLAENDER = {'Baden-Württemberg': 5, 'Bayern': 3.5, 'Berlin': 6, 'Brandenburg': 6.5, 'Bremen': 5.5, 'Hamburg': 5.5, 'Hessen': 6, 'Mecklenburg-Vorpommern': 6,
   'Niedersachsen': 5, 'Nordrhein-Westfalen': 6.5, 'Rheinland-Pfalz': 5, 'Saarland': 6.5, 'Sachsen': 5.5, 'Sachsen-Anhalt': 5, 'Schleswig-Holstein': 6.5, 'Thüringen': 5};
@@ -121,84 +125,135 @@ function krStart(zuruecksetzen) {
   let gespeichert = null;
   if (zuruecksetzen) { try { localStorage.removeItem('fin_kr3'); } catch (e) { /* ok */ } }
   else { try { gespeichert = JSON.parse(localStorage.getItem('fin_kr3')); } catch (e) { /* ok */ } }
-  KR = {...D.kauf, _ziel: 300, ...(gespeichert || {})};
-  if (!gespeichert) {                                     // Standardwerte für die Kaufnebenkosten; Makler nur, wenn die Startwerte keinen eigenen haben
-    KR.grest_satz = KR.grest_satz || KR_DEF.grest_satz.std / 100;
-    KR.notar_satz = KR.notar_satz || KR_DEF.notar_satz.std / 100;
-    if (!KR.makler_satz) KR.makler_satz = KR_DEF.makler_satz.std / 100;
+  KR = {...D.kauf, ...(gespeichert || {})};
+  for (const [k, d] of Object.entries(KR_DEF)) {           // fehlende Werte mit Standardwerten füllen
+    if (typeof KR[k] !== 'number' || isNaN(KR[k])) KR[k] = d.std != null ? (d.pct ? d.std / 100 : d.std) : 0;
   }
+  if (!gespeichert && !KR.makler_satz) KR.makler_satz = KR_DEF.makler_satz.std / 100;
+  if (!KR.bl) KR.bl = Object.keys(BUNDESLAENDER).find(b => BUNDESLAENDER[b] / 100 === KR.grest_satz && b === 'Berlin') || '';   // deine Wohnungen liegen in Berlin
   KR.zimmer = Math.max(1, Math.min(10, Math.round(+KR.zimmer || 1)));
-  for (const k of Object.keys(KR_DEF)) if (typeof KR[k] === 'number') KR[k] = krBegrenzen(k, KR[k]);   // alte oder fremde Werte in den sinnvollen Bereich holen
+  for (const k of Object.keys(KR_DEF)) KR[k] = krBegrenzen(k, KR[k]);   // alte oder fremde Werte in den sinnvollen Bereich holen
 }
 const krWert = k => KR_DEF[k].pct ? KR[k] * 100 : KR[k];
 const krFormat = k => { const d = KR_DEF[k], v = krWert(k); return d.pct ? v.toFixed(d.dez).replace('.', ',') : nf0.format(v); };
 const krRoh = k => { const d = KR_DEF[k], v = krWert(k); return String(d.pct ? +v.toFixed(d.dez) : Math.round(v * 100) / 100).replace('.', ','); };
+const tsd = x => nf0.format(Math.round(x / 1000)) + ' T€';
 
 function krFeld(k) {
   const d = KR_DEF[k], v = krWert(k), [mn, mx] = krGrenzen(k);
-  return `<div class="kr-f"><div class="kr-z"><span>${d.l}${d.ueb ? `<small class="kr-ueb">üblich: ${d.ueb}</small>` : ''}</span><label class="kr-i"><input class="kr-n" data-kr="${k}" inputmode="decimal" value="${krFormat(k)}" autocomplete="off" aria-label="${d.l}"><em>${d.u}</em></label></div>` +
+  return `<div class="kr-f"><div class="kr-z"><span>${d.l}${d.ueb ? `<small class="kr-ueb">${d.ueb}</small>` : ''}</span><label class="kr-i"><input class="kr-n" data-kr="${k}" inputmode="decimal" value="${krFormat(k)}" autocomplete="off" aria-label="${d.l}"><em>${d.u}</em></label></div>` +
     `<input class="kr-r" type="range" data-kr="${k}" min="${mn}" max="${mx}" step="${d.step}" value="${v}" aria-label="${d.l} Regler"></div>`;
 }
-const krZimmer = () => `<div class="kr-f"><div class="kr-z"><span>Zimmer</span><div class="kr-st"><button type="button" data-kr-step="-1" aria-label="weniger">−</button><b id="kr_zimmer">${KR.zimmer}</b><button type="button" data-kr-step="1" aria-label="mehr">+</button></div></div></div>`;
+const krZimmer = () => `<div class="kr-f"><div class="kr-z"><span>Zimmer<small class="kr-ueb">vermietbare Zimmer</small></span><div class="kr-st"><button type="button" data-kr-step="-1" aria-label="weniger"${KR.zimmer <= 1 ? ' disabled' : ''}>−</button><b id="kr_zimmer">${KR.zimmer}</b><button type="button" data-kr-step="1" aria-label="mehr"${KR.zimmer >= 10 ? ' disabled' : ''}>+</button></div></div></div>`;
 
-function kurve(p) {
-  const W = 340, H = 196, pl = 8, pr = 8, pt = 22, pb = 24, pts = [], max = maxKaufpreis(p, p._ziel);
-  let lo = Math.max(30000, p.kaufpreis * 0.55), hi = p.kaufpreis * 1.45;
-  if (max > 0) { lo = Math.max(30000, Math.min(lo, max * 0.8)); hi = Math.max(hi, Math.min(max * 1.15, p.kaufpreis * 3)); }   // Schnittpunkt mit dem Ziel soll sichtbar sein
-  for (let i = 0; i <= 30; i++) { const x = lo + (hi - lo) * i / 30; pts.push([x, kaufrechnen({...p, kaufpreis: x}).cashflow]); }
-  const ys = pts.map(q => q[1]).concat([0, p._ziel]), mn = Math.min(...ys), mx = Math.max(...ys), span = (mx - mn) || 1;
-  const X = x => pl + (x - lo) / (hi - lo) * (W - pl - pr), Y = y => pt + (mx - y) / span * (H - pt - pb);
-  const cur = kaufrechnen(p).cashflow, k = x => Math.round(x / 1000) + 'k';
-  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">`;
-  s += `<line x1="${pl}" x2="${W - pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--text2)" opacity=".45"/><text x="${W - pr}" y="${Y(0) - 3}" text-anchor="end">0 €</text>`;
-  s += `<line x1="${pl}" x2="${W - pr}" y1="${Y(p._ziel)}" y2="${Y(p._ziel)}" stroke="var(--orange)" stroke-dasharray="4 3"/><text x="${pl + 2}" y="${Y(p._ziel) - 3}" style="fill:var(--orange)">Ziel ${eur(p._ziel)}</text>`;
-  s += `<polyline fill="none" stroke="var(--blau)" stroke-width="2.6" stroke-linejoin="round" points="${pts.map(q => X(q[0]) + ',' + Y(q[1])).join(' ')}"/>`;
-  if (max > lo && max < hi) s += `<line x1="${X(max)}" x2="${X(max)}" y1="${pt}" y2="${H - pb}" stroke="var(--gruen)" stroke-dasharray="3 3"/><text x="${X(max)}" y="${pt - 7}" text-anchor="middle" style="fill:var(--gut)">max. ${k(max)}</text>`;
-  s += `<circle cx="${X(p.kaufpreis)}" cy="${Y(cur)}" r="5.5" fill="var(--blau)" stroke="var(--karte)" stroke-width="2"/>`;
-  s += `<text x="${X(p.kaufpreis)}" y="${Y(cur) + (cur > (mx + mn) / 2 ? 15 : -9)}" text-anchor="middle" style="fill:var(--text);font-weight:600">Du: ${eur(cur)}</text>`;
-  s += `<text x="${pl}" y="${H - 6}">${k(lo)} €</text><text x="${W / 2}" y="${H - 6}" text-anchor="middle">Kaufpreis</text><text x="${W - pr}" y="${H - 6}" text-anchor="end">${k(hi)} €</text>`;
+// Urteil: grün = Ziel erreicht, orange = trägt sich, aber unter dem Ziel, rot = du zahlst drauf
+function krUrteil(cf, ziel) {
+  if (cf >= ziel) return {k: 'gut', farbe: 'var(--gut)', grund: 'var(--gruen)', text: 'Rechnet sich'};
+  if (cf >= 0) return {k: 'knapp', farbe: 'var(--orange)', grund: 'var(--orange)', text: 'Unter deinem Ziel'};
+  return {k: 'schlecht', farbe: 'var(--schlecht)', grund: 'var(--rot)', text: 'Du zahlst drauf'};
+}
+
+// Diagramm: Cashflow je Kaufpreis, Zielzone grün, Marker für deinen Preis und den Höchstpreis
+function kurve(p, max) {
+  const W = 340, H = 250, pl = 46, pr = 12, pt = 16, pb = 58, pts = [];
+  const anker = [p.kaufpreis].concat(max > 0 ? [max] : []);
+  const lo = Math.max(30000, Math.min(...anker) * 0.7), hi = Math.max(...anker) * 1.3;
+  for (let i = 0; i <= 40; i++) { const x = lo + (hi - lo) * i / 40; pts.push([x, kaufrechnen({...p, kaufpreis: x}).cashflow]); }
+  const ys = pts.map(q => q[1]).concat([0, p._ziel]);
+  let mn = Math.min(...ys), mx = Math.max(...ys); const pad = (mx - mn) * 0.08 || 50; mn -= pad; mx += pad;
+  const schritt = [50, 100, 200, 250, 500, 1000, 2000].find(s => (mx - mn) / s <= 5) || 5000;
+  const X = x => pl + (x - lo) / (hi - lo) * (W - pl - pr), Y = y => pt + (mx - y) / (mx - mn) * (H - pt - pb);
+  const cur = kaufrechnen(p).cashflow, unten = H - pb, clampX = x => Math.max(pl + 34, Math.min(W - pr - 34, x));
+  let s = `<svg class="chart kr-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cashflow je nach Kaufpreis">`;
+  s += `<rect x="${pl}" y="${pt}" width="${W - pl - pr}" height="${Math.max(0, Y(p._ziel) - pt)}" fill="var(--gruen)" opacity=".1"/>`;
+  for (let v = Math.ceil(mn / schritt) * schritt; v <= mx; v += schritt) {
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--linie)" ${v === 0 ? 'stroke-width="1.5" style="stroke:var(--text2);opacity:.5"' : ''}/>`;
+    s += `<text x="${pl - 6}" y="${Y(v) + 4}" text-anchor="end">${nf0.format(v)} €</text>`;
+  }
+  s += `<line x1="${pl}" x2="${W - pr}" y1="${Y(p._ziel)}" y2="${Y(p._ziel)}" stroke="var(--gut)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  s += `<text x="${W - pr - 2}" y="${Y(p._ziel) - 5}" text-anchor="end" class="kr-c-ziel">Ziel ${eur(p._ziel)}</text>`;
+  s += `<polyline fill="none" stroke="var(--blau)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="${pts.map(q => X(q[0]).toFixed(1) + ',' + Y(q[1]).toFixed(1)).join(' ')}"/>`;
+  // Höchstpreis (Zeile 2 unter der Achse)
+  if (max > lo && max < hi) {
+    s += `<line x1="${X(max)}" x2="${X(max)}" y1="${Y(p._ziel)}" y2="${unten + 30}" stroke="var(--gut)" stroke-dasharray="3 3"/>`;
+    s += `<circle cx="${X(max)}" cy="${Y(p._ziel)}" r="5" fill="var(--gruen)" stroke="var(--karte)" stroke-width="2"/>`;
+    s += `<rect x="${clampX(X(max)) - 34}" y="${unten + 30}" width="68" height="22" rx="11" fill="var(--gruen)"/><text x="${clampX(X(max))}" y="${unten + 45}" text-anchor="middle" class="kr-c-lab" style="fill:#fff">max. ${tsd(max)}</text>`;
+  }
+  // Dein Preis (Zeile 1 unter der Achse)
+  s += `<line x1="${X(p.kaufpreis)}" x2="${X(p.kaufpreis)}" y1="${Y(cur)}" y2="${unten + 4}" stroke="var(--blau)" opacity=".5"/>`;
+  s += `<circle cx="${X(p.kaufpreis)}" cy="${Y(cur)}" r="6.5" fill="var(--blau)" stroke="var(--karte)" stroke-width="2.5"/>`;
+  s += `<rect x="${clampX(X(p.kaufpreis)) - 34}" y="${unten + 4}" width="68" height="22" rx="11" fill="var(--blau)"/><text x="${clampX(X(p.kaufpreis))}" y="${unten + 19}" text-anchor="middle" class="kr-c-lab" style="fill:#fff">du ${tsd(p.kaufpreis)}</text>`;
+  s += `<text x="${X(p.kaufpreis) + (X(p.kaufpreis) > W / 2 ? -10 : 10)}" y="${Y(cur) - 10}" text-anchor="${X(p.kaufpreis) > W / 2 ? 'end' : 'start'}" class="kr-c-wert">${eur(cur)}</text>`;
+  s += `<text x="${pl}" y="${H - 1}" class="kr-c-achse">← günstiger</text><text x="${W - pr}" y="${H - 1}" text-anchor="end" class="kr-c-achse">teurer →</text>`;
   return s + '</svg>';
 }
 function investition(p, r) {
-  const teile = [['Kaufpreis', p.kaufpreis, 'var(--blau)'], ['Nebenkosten', r.nk, 'var(--orange)'], ['Renovierung', p.renovierung, 'var(--lila)'], ['Möbel', p.moebel, 'var(--gruen)']].filter(t => t[1] > 0);
+  const teile = [['Kaufpreis', p.kaufpreis, 'var(--blau)'], ['Kaufnebenkosten', r.nk, 'var(--orange)'], ['Renovierung', p.renovierung, 'var(--lila)'], ['Möbel', p.moebel, 'var(--gruen)']].filter(t => t[1] > 0);
   const ek = Math.min(p.eigenkapital, r.gesamt), leg = (farbe, text, wert) => `<div><i style="background:${farbe}"></i><span>${text}</span><em>${eur(wert)}</em></div>`;
-  return `<div class="klein" style="margin:0 0 6px">Das kostet dich insgesamt ${eur(r.gesamt)}</div><div class="stack">${teile.map(t => `<i style="width:${t[1] / r.gesamt * 100}%;background:${t[2]}"></i>`).join('')}</div>` +
-    `<div class="legende" style="margin:8px 0 14px">${teile.map(t => leg(t[2], t[0], t[1])).join('')}</div>` +
-    `<div class="klein" style="margin:0 0 6px">So bezahlst du es</div><div class="stack"><i style="width:${ek / r.gesamt * 100}%;background:var(--gruen)"></i><i style="width:${r.darlehen / r.gesamt * 100}%;background:var(--grau)"></i></div>` +
-    `<div class="legende" style="margin-top:8px">${leg('var(--gruen)', 'Eigenkapital', ek)}${leg('var(--grau)', 'Darlehen', r.darlehen)}</div>`;
+  return `<div class="kr-summe"><span>Gesamtkosten</span><b>${eur(r.gesamt)}</b></div><div class="stack">${teile.map(t => `<i style="width:${t[1] / r.gesamt * 100}%;background:${t[2]}"></i>`).join('')}</div>` +
+    `<div class="legende" style="margin:8px 0 16px">${teile.map(t => leg(t[2], t[0], t[1])).join('')}</div>` +
+    `<div class="kr-summe"><span>So bezahlst du es</span><b>${Math.round(ek / r.gesamt * 100)} % Eigenkapital</b></div><div class="stack"><i style="width:${ek / r.gesamt * 100}%;background:var(--gruen)"></i><i style="width:${r.darlehen / r.gesamt * 100}%;background:var(--grau)"></i></div>` +
+    `<div class="legende" style="margin-top:8px">${leg('var(--gruen)', 'Eigenkapital', ek)}${leg('var(--grau)', 'Darlehen von der Bank', r.darlehen)}</div>`;
 }
 function krKopf() {
-  const r = kaufrechnen(KR), max = maxKaufpreis(KR, KR._ziel), ok = r.cashflow >= KR._ziel, knapp = !ok && r.cashflow >= 0;
-  const farbe = ok ? 'gruen' : knapp ? 'orange' : 'rot', text = ok ? 'Rechnet sich' : knapp ? 'Knapp' : 'Zu teuer';
-  $('#kr_kopf').innerHTML = `<div class="kr-zeile"><div><div class="kr-gross ${ton(r.cashflow)}">${eur(r.cashflow)}</div><div class="kr-sub">Cashflow pro Monat vor Steuern</div></div>` +
-    `<div class="kr-urteil"><span class="chip" style="background:color-mix(in srgb,var(--${farbe}) 20%,transparent);color:var(--${farbe === 'gruen' ? 'gut' : farbe === 'rot' ? 'schlecht' : 'orange'})">${text}</span>` +
-    `<div class="kr-sub">fürs Ziel max. ${eur(max)}</div></div></div>` + krHinweisHtml(krHinweise(KR, r).slice(0, 1));
+  const r = kaufrechnen(KR), max = maxKaufpreis(KR, KR._ziel), u = krUrteil(r.cashflow, KR._ziel);
+  const warn = krHinweise(KR, r).filter(h => h[0] === 'warn').length;
+  $('#kr_kopf').innerHTML = `<div class="kr-zeile"><div><div class="kr-sub">Bleibt pro Monat</div><div class="kr-gross" style="color:${u.farbe}">${eur(r.cashflow)}</div>` +
+    `<span class="kr-chip" style="background:color-mix(in srgb,${u.grund} 18%,transparent);color:${u.farbe}">${u.text}</span></div>` +
+    `<div class="kr-max"><div class="kr-sub">Höchstpreis fürs Ziel</div><div class="kr-max-w">${max > 0 ? eur(max) : '–'}</div>` +
+    `<div class="kr-sub">${max <= 0 ? 'Ziel nicht erreichbar' : max >= KR.kaufpreis ? `${eur(max - KR.kaufpreis)} Luft` : `${eur(KR.kaufpreis - max)} zu teuer`}</div></div></div>` +
+    (warn && KRT === 'eingabe' ? `<button class="kr-warnlink" data-a="kr_tab|ergebnis">⚠︎ ${warn === 1 ? '1 Hinweis' : warn + ' Hinweise'} zur Finanzierung ›</button>` : '');
   if (KRT === 'ergebnis') krBody();
+}
+// Kennzahl mit Ampel und Erklärung
+function kz(titel, wert, ampel, erkl) {
+  const f = {gut: 'var(--gruen)', mittel: 'var(--orange)', schlecht: 'var(--rot)', '': 'var(--grau)'}[ampel];
+  return `<div class="kr-kz"><i style="background:${f}"></i><div><b>${titel}</b><small>${erkl}</small></div><em>${wert}</em></div>`;
 }
 function krBody() {
   const p = KR, el = $('#kr_body'); if (!el) return;
   if (KRT === 'eingabe') {
-    el.innerHTML = `<h3>Wohnung</h3><div class="karte">${krFeld('kaufpreis')}${krZimmer()}${krFeld('miete_pro_zimmer')}</div>` +
+    el.innerHTML = `<h3>Dein Ziel</h3><div class="karte">${krFeld('_ziel')}</div>` +
+      `<h3>Wohnung</h3><div class="karte">${krFeld('kaufpreis')}${krZimmer()}${krFeld('miete_pro_zimmer')}</div>` +
       `<h3>Finanzierung</h3><div class="karte">${krFeld('eigenkapital')}${krFeld('zinssatz')}${krFeld('tilgung')}</div>` +
-      `<h3>Kosten & Risiko</h3><div class="karte">${krFeld('hausgeld')}${krFeld('nebenkosten_monat')}${krFeld('renovierung')}${krFeld('moebel')}${krFeld('leerstand')}</div>` +
-      `<h3>Kaufnebenkosten <small>schon voreingestellt</small></h3><div class="karte"><div class="kr-f"><div class="kr-z"><span>Bundesland <small class="kr-ueb">bestimmt die Grunderwerbsteuer</small></span>` +
-      `<select class="feld kr-bl" id="kr_bl" aria-label="Bundesland"><option value="">–</option>${Object.keys(BUNDESLAENDER).map(b => `<option${KR.bl === b ? ' selected' : ''}>${b}</option>`).join('')}</select></div></div>` +
-      `${krFeld('grest_satz')}${krFeld('makler_satz')}${krFeld('notar_satz')}<div class="klein" id="kr_nk"></div></div>` +
-      `<details class="karte kr-mehr"><summary>Weitere Annahmen</summary>${['grundsteuer', '_ziel'].map(krFeld).join('')}</details>` +
-      `<div class="klein">Tipp: Zahl antippen und direkt tippen, oder den Regler ziehen. Oben siehst du sofort, was es bewirkt.</div>` +
+      `<h3>Laufende Kosten</h3><div class="karte">${krFeld('hausgeld')}${krFeld('nebenkosten_monat')}${krFeld('leerstand')}</div>` +
+      `<h3>Einmalig</h3><div class="karte">${krFeld('renovierung')}${krFeld('moebel')}</div>` +
+      `<h3>Kaufnebenkosten <small>voreingestellt</small></h3><div class="karte"><div class="kr-f"><div class="kr-z"><span>Bundesland<small class="kr-ueb">setzt die Grunderwerbsteuer</small></span>` +
+      `<select class="feld kr-bl" id="kr_bl" aria-label="Bundesland"><option value="">wählen …</option>${Object.keys(BUNDESLAENDER).map(b => `<option${p.bl === b ? ' selected' : ''}>${b}</option>`).join('')}</select></div></div>` +
+      `${krFeld('grest_satz')}${krFeld('makler_satz')}${krFeld('notar_satz')}<div class="kr-summe kr-nk" id="kr_nk"></div></div>` +
+      `<details class="karte kr-mehr"><summary>Weitere Annahmen<small class="kr-ueb">Grundsteuer, Steuern, Abschreibung – voreingestellt</small></summary>` +
+      `${['grundsteuer', 'sonstige_einnahmen', 'steuersatz', 'gebaeudeanteil', 'afa_satz'].map(krFeld).join('')}</details>` +
       `<button class="knopf hell" data-a="kr_zurueck">Auf meine Startwerte zurücksetzen</button>`;
+    krNebenInfo();
     return;
   }
-  const r = kaufrechnen(p), zins = r.rate - r.tilg;
-  const stress = [['Zins +1 Prozentpunkt', {...p, zinssatz: p.zinssatz + 0.01}], ['Miete −10 %', {...p, miete_pro_zimmer: p.miete_pro_zimmer * 0.9, sonstige_einnahmen: p.sonstige_einnahmen * 0.9}],
-    ['Leerstand 15 %', {...p, leerstand: Math.max(p.leerstand, 0.15)}]];
-  el.innerHTML = `<h3>Wohin geht die Miete? <small>pro Monat</small></h3><div class="karte">${wasserfall([['Miete (nach Leerstand)', r.ein], ['Laufende Kosten', -r.kosten], ['Zinsen', -zins], ['Tilgung', -r.tilg]], 'Cashflow')}` +
-    `<div class="klein">Die Tilgung ist kein Verlust: Damit baust du Eigenkapital in der Wohnung auf (${eur(r.tilg)} im Monat).</div></div>` +
-    `<h3>Kaufpreis und Cashflow</h3><div class="karte">${kurve(p)}<div class="klein">Die Linie zeigt, wie sich der Cashflow mit dem Kaufpreis ändert. Alles über der gestrichelten Zielgeraden erreicht dein Ziel.</div></div>` +
+  const r = kaufrechnen(p), zins = r.rate - r.tilg, max = maxKaufpreis(p, p._ziel), u = krUrteil(r.cashflow, p._ziel), h = krHinweise(p, r);
+  const diff = max - p.kaufpreis;
+  const satz = max <= 0 ? `Dein Ziel von ${eur(p._ziel)} ist mit diesen Annahmen bei keinem Kaufpreis erreichbar – dafür braucht es mehr Miete oder mehr Eigenkapital.`
+    : diff >= 0 ? `Für dein Ziel von ${eur(p._ziel)} im Monat darfst du bis <b>${eur(max)}</b> zahlen – du hast <b>${eur(diff)}</b> Luft.`
+      : `Für dein Ziel von ${eur(p._ziel)} im Monat dürfte die Wohnung höchstens <b>${eur(max)}</b> kosten – also <b>${eur(-diff)}</b> weniger. Das ist dein Verhandlungsziel.`;
+  const stress = [['Zins steigt um 1 %-Punkt', {...p, zinssatz: p.zinssatz + 0.01}], ['Miete 10 % niedriger', {...p, miete_pro_zimmer: p.miete_pro_zimmer * 0.9, sonstige_einnahmen: p.sonstige_einnahmen * 0.9}],
+    ['Leerstand 15 %', {...p, leerstand: Math.max(p.leerstand, 0.15)}], ['Ein Zimmer dauerhaft leer', {...p, zimmer: Math.max(0, p.zimmer - 1)}]];
+  const a = (v, g, m) => v >= g ? 'gut' : v >= m ? 'mittel' : 'schlecht';
+  el.innerHTML = `<div class="karte kr-fazit" style="border-left:4px solid ${u.grund}"><div class="kr-fazit-t" style="color:${u.farbe}">${u.text}</div>` +
+    `<p>Bei ${eur(p.kaufpreis)} bleiben dir <b>${eur(r.cashflow)}</b> im Monat (nach Steuern ca. ${eur(r.cfNach)}).</p><p>${satz}</p>` +
+    `<div class="kr-zwei"><div><small>Dein Preis</small><b>${eur(p.kaufpreis)}</b></div><div><small>Höchstpreis fürs Ziel</small><b style="color:var(--gut)">${max > 0 ? eur(max) : '–'}</b></div></div>` +
+    (h.length ? `<div style="margin-top:10px">${krHinweisHtml(h)}</div>` : '') + `</div>` +
+    `<h3>Bis zu welchem Preis lohnt es sich?</h3><div class="karte">${kurve(p, max)}<div class="klein">Blaue Linie = was dir im Monat bleibt. Im grünen Bereich erreichst du dein Ziel. Je teurer die Wohnung, desto weniger bleibt.</div></div>` +
+    `<h3>Wohin geht die Miete? <small>pro Monat</small></h3><div class="karte">${wasserfall([['Miete', r.ein], ['Kosten', -r.kosten], ['Zinsen', -zins], ['Tilgung', -r.tilg]], 'Bleibt')}` +
+    `<div class="klein">Miete nach ${Math.round(p.leerstand * 100)} % Leerstand. Die Tilgung ist kein Verlust: Damit zahlst du ${eur(r.tilg)} im Monat in deine eigene Wohnung ein.</div></div>` +
     `<h3>Wie viel Geld brauchst du?</h3><div class="karte">${investition(p, r)}</div>` +
-    `<h3>Stresstest</h3>` + liste(stress.map(([t, q]) => { const c = kaufrechnen(q).cashflow; return zeile({punkt: c >= 0 ? 'var(--gruen)' : 'var(--rot)', titel: t, unter: 'Cashflow pro Monat', rechts: `<span class="${ton(c)}">${eur(c)}</span>`}); })) +
-    `<h3>Kennzahlen</h3><div class="karte">${kv('Nach Steuern (ca.)', eur(r.cfNach))}${kv('Rate pro Monat', eur(r.rate))}${kv('Kaufnebenkosten', eur(r.nk))}${kv('Bruttorendite', pct(r.brutto, 1))}${kv('Nettorendite', pct(r.netto, 1))}` +
-    `${kv('Kaufpreisfaktor', r.faktor.toFixed(1).replace('.', ','))}${kv('EK-Rendite inkl. Tilgung', pct(r.ek, 1))}</div>`;
+    `<h3>Was wäre, wenn …</h3>` + liste(stress.map(([t, q]) => {
+      const c = kaufrechnen(q).cashflow, d = c - r.cashflow;
+      return zeile({punkt: c >= p._ziel ? 'var(--gruen)' : c >= 0 ? 'var(--orange)' : 'var(--rot)', titel: t, unter: `${d >= 0 ? '+' : '−'}${eur(Math.abs(d))} gegenüber jetzt`, rechts: `<span class="${ton(c)}">${eur(c)}</span>`});
+    })) +
+    `<h3>Kennzahlen</h3><div class="karte">` +
+    kz('Bruttorendite', pct(r.brutto, 1), a(r.brutto, 0.055, 0.045), 'Jahresmiete ÷ Kaufpreis · gut ab 5,5 %') +
+    kz('Kaufpreisfaktor', r.faktor.toFixed(1).replace('.', ','), r.faktor <= 18 ? 'gut' : r.faktor <= 22 ? 'mittel' : 'schlecht', 'So viele Jahresmieten kostet sie · gut bis 18') +
+    kz('Nettorendite', pct(r.netto, 1), a(r.netto, 0.04, 0.03), 'nach laufenden Kosten, auf alles, was du investierst') +
+    kz('Eigenkapital-Rendite', pct(r.ek, 1), a(r.ek, 0.08, 0.04), 'inkl. Tilgung · was dein Geld pro Jahr bringt') +
+    kz('Rate an die Bank', eur(r.rate), '', `Zins ${pct(p.zinssatz, 2)} + Tilgung ${pct(p.tilgung, 2)} auf ${eur(r.darlehen)}`) +
+    kz('Kaufnebenkosten', eur(r.nk), '', `${pct(p.grest_satz + p.makler_satz + p.notar_satz, 2)} vom Kaufpreis`) + `</div>`;
 }
 // Zimmer +/−: reagiert schon beim Antippen (pointerdown) und lässt Tastatur/Fokus in Ruhe – sonst verschluckt iOS den ersten Tipp
 function krZimmerAendern(d) {
@@ -272,7 +327,7 @@ document.addEventListener('change', e => {
 function krNebenInfo() {
   const el = $('#kr_nk'); if (!el || !KR) return;
   const s = KR.grest_satz + KR.makler_satz + KR.notar_satz;
-  el.textContent = `Zusammen ${(s * 100).toFixed(2).replace('.', ',')} % vom Kaufpreis = ${eur(KR.kaufpreis * s)}`;
+  el.innerHTML = `<span>Zusammen ${(s * 100).toFixed(2).replace('.', ',')} % vom Kaufpreis</span><b>${eur(KR.kaufpreis * s)}</b>`;
 }
 
 function werkzeugeHtml() {
@@ -288,6 +343,6 @@ Object.assign(AKT, {
   kauf: sheetKauf, spielraum: sheetSpielraum, freiheit: sheetFreiheit, bericht: sheetBericht, erinnerung: sheetErinnerung,
   teilen_text: id => teilen(wert(id), 'Finanzen'), kopieren_text: id => kopieren(wert(id)),
   kr_zurueck: () => { krStart(true); krBody(); krNebenInfo(); krKopf(); toast('Startwerte wiederhergestellt'); },
-  kr_tab: k => { KRT = k; document.querySelectorAll('#kr_seg button').forEach(b => b.classList.toggle('an', b.dataset.a === 'kr_tab|' + k)); krBody(); $('#sheet-inhalt').scrollTop = 0; },
+  kr_tab: k => { KRT = k; document.querySelectorAll('#kr_seg button').forEach(b => b.classList.toggle('an', b.dataset.a === 'kr_tab|' + k)); krKopf(); krBody(); $('#sheet-inhalt').scrollTop = 0; },
   kr_step: (k, d) => krZimmerAendern(+d),
 });

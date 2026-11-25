@@ -200,3 +200,32 @@ select.feld { appearance: none; -webkit-appearance: none; background-image: line
 .kr-hint { font-size: .8rem; padding: 7px 10px; border-radius: 10px; margin-top: 6px; background: var(--fuell); color: var(--text2); }
 .kr-hint.warn { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--text); }
 .kr-st button:disabled { opacity: .35; }
+
+/* Wohnungs-Check v3 */
+.kr-zeile { align-items: flex-end; }
+.kr-chip { display: inline-block; font-size: .78rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; margin-top: 4px; }
+.kr-max { text-align: right; }
+.kr-max-w { font-size: 1.25rem; font-weight: 650; color: var(--gut); letter-spacing: -.02em; }
+.kr-warnlink { display: block; width: 100%; text-align: left; margin-top: 8px; font-size: .8rem; padding: 7px 10px; border-radius: 10px; background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--text); }
+.kr-summe { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .88rem; color: var(--text2); margin: 2px 0 8px; }
+.kr-summe b { color: var(--text); font-size: 1rem; }
+.kr-nk { margin: 10px 0 2px; padding-top: 10px; border-top: 1px solid var(--linie); }
+.kr-mehr summary .kr-ueb { margin-top: 2px; }
+.kr-fazit { margin-top: 6px; }
+.kr-fazit-t { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+.kr-fazit p { margin: 6px 0; font-size: .92rem; line-height: 1.4; }
+.kr-zwei { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.kr-zwei > div { background: var(--fuell); border-radius: 12px; padding: 9px 12px; }
+.kr-zwei small { display: block; color: var(--text2); font-size: .74rem; }
+.kr-zwei b { font-size: 1.1rem; }
+.kr-chart text { font-size: 10.5px; }
+.kr-chart .kr-c-lab { font-size: 11px; font-weight: 700; }
+.kr-chart .kr-c-wert { fill: var(--text); font-size: 12px; font-weight: 700; }
+.kr-chart .kr-c-ziel { fill: var(--gut); font-weight: 600; font-size: 11px; }
+.kr-chart .kr-c-achse { font-size: 10px; }
+.kr-kz { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; }
+.kr-kz + .kr-kz { border-top: 1px solid var(--linie); }
+.kr-kz > i { width: 10px; height: 10px; border-radius: 50%; }
+.kr-kz b { display: block; font-weight: 600; font-size: .92rem; }
+.kr-kz small { display: block; color: var(--text2); font-size: .74rem; line-height: 1.3; }
+.kr-kz em { font-style: normal; font-weight: 650; white-space: nowrap; }
