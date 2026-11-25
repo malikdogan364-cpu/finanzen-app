@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App aktualisieren</title>
+<style>
+  body { font: 17px -apple-system, system-ui, sans-serif; background: #f2f2f7; color: #111; margin: 0; padding: 40px 20px; text-align: center; }
+  @media (prefers-color-scheme: dark) { body { background: #000; color: #f2f2f7; } }
+  p { color: #8e8e93; }
+</style>
+</head>
+<body>
+<h2 id="t">App wird aktualisiert …</h2>
+<p id="u">Deine Daten bleiben erhalten.</p>
+<script>
+// Entfernt alte Programmversionen (Service Worker + Zwischenspeicher) und startet die App neu. Daten in IndexedDB bleiben.
+(async () => {
+  try {
+    if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k);
+  } catch (e) { /* weiter */ }
+  document.getElementById('t').textContent = 'Fertig ✓';
+  document.getElementById('u').textContent = 'Die App startet neu …';
+  setTimeout(() => location.replace('./?neu=' + Date.now()), 900);
+})();
+</script>
+</body>
+</html>
