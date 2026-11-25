@@ -1,7 +1,7 @@
 /* Service Worker: legt die App (nur Code, keine Daten) im Zwischenspeicher ab, damit sie offline startet.
    App-Dateien: zuerst aus dem Netz (immer die neueste Version), ohne Netz aus dem Speicher.
    Texterkennung (ocr/): aus dem Speicher (groß, ändert sich nie). */
-const VERSION = 'finanzen-v10';       // bei jeder Änderung an der App hochzählen
+const VERSION = 'finanzen-v11';       // bei jeder Änderung an der App hochzählen
 const DATEIEN = ['./', 'index.html', 'style.css', 'app.js', 'erfassen.js', 'werkzeuge.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
