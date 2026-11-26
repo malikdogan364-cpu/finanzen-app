@@ -11,11 +11,12 @@ const neueId = () => (crypto.randomUUID ? crypto.randomUUID() : 'e' + Date.now()
 const wert = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
 const zahlFeld = id => { const t = wert(id); return t ? zahlAusText(t.replace(/\s/g, '')) : null; };
 
-const ART_NAME = {ausgabe: 'Ausgabe', miete: 'Mietzahlung', uebergabe: 'Übergabe', todo: 'To-do'};
+const ART_NAME = {ausgabe: 'Ausgabe', miete: 'Mietzahlung', uebergabe: 'Übergabe', todo: 'To-do', todo_erledigt: 'To-do erledigt'};
 function erfBeschreibung(e) {
   if (e.art === 'ausgabe') return `${e.text || (e.fotos && e.fotos.length ? 'Beleg-Foto' : 'Ausgabe')} · ${{wohnung: 'Wohnung', privat: 'privat', auto: 'automatisch'}[e.bereich] || ''}${e.kategorie ? ': ' + e.kategorie : ''}`;
   if (e.art === 'miete') { const v = D && D.vermietung.vertraege.find(x => x.id === e.vertrag); return `${v ? v.mieter : e.vertrag} · Miete ${e.monat || ''} (${e.wie || 'bar'})`; }
   if (e.art === 'uebergabe') { const v = D && D.vermietung.vertraege.find(x => x.id === e.vertrag); return `${e.uart === 'einzug' ? 'Einzug' : 'Auszug'} ${v ? v.mieter : e.vertrag}`; }
+  if (e.art === 'todo_erledigt') return '✓ ' + (e.titel || 'To-do');
   return e.titel || 'Notiz';
 }
 
