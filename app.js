@@ -114,17 +114,18 @@ let D = null;                                   // entschlüsselte Momentaufnahm
 const S = {tab: 'cockpit', vtab: 'mieten', pm: null, q: '', bereich: 'alle', zeit: 'alle', limit: 60, gesp: null, datei: null};
 
 // ====================================================================== Diagramme (SVG, ohne Bibliothek)
+// schritte: [Bezeichnung, Betrag, optional Aktion] – mit Aktion ist die Zeile antippbar (Drill-down)
 function wasserfall(schritte, endLabel) {
   let cum = 0; const rows = [];
-  schritte.forEach(([l, v]) => { rows.push({l, a: cum, b: cum + v, v}); cum += v; });
+  schritte.forEach(([l, v, akt]) => { rows.push({l, a: cum, b: cum + v, v, akt}); cum += v; });
   rows.push({l: endLabel, a: 0, b: cum, v: cum, total: true});
   const alle = rows.flatMap(r => [r.a, r.b, 0]), mn = Math.min(...alle), mx = Math.max(...alle), span = (mx - mn) || 1;
   const pos = x => (x - mn) / span * 100;
-  return '<div class="wf">' + rows.map(r => {
+  return `<div class="wf${rows.some(r => r.akt) ? ' wf-klick' : ''}">` + rows.map(r => {
     const l = pos(Math.min(r.a, r.b)), w = Math.max(pos(Math.max(r.a, r.b)) - l, 1);
-    const c = r.total ? 'var(--blau)' : (r.v >= 0 ? 'var(--gruen)' : 'var(--rot)');
-    return `<div class="wf-r"><div class="wf-l">${esc(r.l)}</div><div class="wf-t"><i style="left:${pos(0)}%"></i>` +
-      `<b style="left:${l}%;width:${w}%;background:${c}"></b></div><div class="wf-v ${r.total ? '' : ton(r.v)}">${eur(r.v)}</div></div>`;
+    const c = r.total ? 'var(--blau)' : (r.v >= 0 ? 'var(--gruen)' : 'var(--rot)'), tag = r.akt ? 'button' : 'div';
+    return `<${tag} class="wf-r${r.akt ? ' pfeil' : ''}"${r.akt ? ` data-a="${esc(r.akt)}"` : ''}><div class="wf-l">${esc(r.l)}</div><div class="wf-t"><i style="left:${pos(0)}%"></i>` +
+      `<b style="left:${l}%;width:${w}%;background:${c}"></b></div><div class="wf-v ${r.total ? '' : ton(r.v)}">${eur(r.v)}</div></${tag}>`;
   }).join('') + '</div>';
 }
 function hbalken(items, o = {}) {
@@ -178,13 +179,19 @@ function stapel(items, farben, o = {}) {
     s += `<polyline pointer-events="none" fill="none" stroke="var(--blau)" stroke-width="2" stroke-linejoin="round" points="${o.linie.map((v, i) => `${i * bw + bw / 2},${y(v)}`).join(' ')}"/>`;
     s += o.linie.map((v, i) => `<circle pointer-events="none" cx="${i * bw + bw / 2}" cy="${y(v)}" r="2.6" fill="var(--blau)"/>`).join('');
   }
-  if (o.akt) items.forEach((it, i) => s += `<rect x="${i * bw}" y="0" width="${bw}" height="${H}" fill="transparent" data-a="${o.akt}|${it.id}"/>`);
+  if (o.akt) items.forEach((it, i) => s += `<rect x="${i * bw}" y="0" width="${bw}" height="${H}" fill="transparent" data-a="${esc(o.akt + '|' + it.id)}"/>`);
   return s + '</svg>';
 }
 
 // ====================================================================== Sheets (Detail-Fenster)
 const stack = [];
 function sheet(titel, html) { stack.push({titel, html}); sheetZeigen(); }
+// Inhalt des obersten Fensters austauschen (z. B. anderen Monat wählen), ohne den Zurück-Stapel zu verlängern
+function sheetErsetzen(titel, html) {
+  if (!stack.length || $('#sheet').hidden) return sheet(titel, html);
+  const y = $('#sheet-inhalt').scrollTop;
+  stack[stack.length - 1] = {titel, html}; sheetZeigen(); $('#sheet-inhalt').scrollTop = y;
+}
 function sheetZeigen() {
   const s = stack[stack.length - 1];
   $('#sheet-titel').textContent = s.titel;
@@ -246,12 +253,12 @@ function cockpit() {
     kachel('s_check', 'Monats-Check', `${ck.erledigt} / ${ck.gesamt}`, ck.erledigt === ck.gesamt ? 'erledigt' : `${ck.gesamt - ck.erledigt} Punkte offen`, ck.erledigt === ck.gesamt ? 'gut' : '') +
     `</div>` +
     `<div class="werkzeuge">${[['spielraum', 'Spielraum'], ['freiheit', 'Freiheit'], ['kauf', 'Wohnungs-Check'], ['bericht', 'Bericht']].map(([a, l]) => `<button data-a="${a}">${l}</button>`).join('')}</div>` +
-    `<h3>Wichtig</h3>` + liste(c.wichtig.slice(0, 6).map((w, i) => zeile({
+    `<h3>Wichtig</h3>` + kurzListe(wichtigListe().map((w, i) => zeile({
       punkt: w.stufe === 'fehler' ? 'var(--rot)' : w.stufe === 'warnung' ? 'var(--orange)' : 'var(--blau)', akt: `s_wichtig|${i}`,
       titel: esc(w.titel), unter: esc((w.text || '').slice(0, 90)), rechts: w.betrag ? eur(w.betrag) : null})).concat(
-      c.wichtig.length ? [] : [zeile({punkt: 'var(--gruen)', titel: 'Alles im grünen Bereich'})])) +
-    `<h3>Als Nächstes</h3>` + liste(c.termine.slice(0, 6).map(t => zeile({punkt: ARTEN[t.art] || 'var(--grau)', titel: esc(t.titel),
-      unter: esc(t.detail), rechts: dKurz(t.datum), fett: false}))) +
+      wichtigListe().length ? [] : [zeile({punkt: 'var(--gruen)', titel: 'Alles im grünen Bereich'})]), 5, 'Alle') +
+    `<h3>Als Nächstes</h3>` + liste(c.termine.slice(0, 5).map(t => zeile({punkt: ARTEN[t.art] || 'var(--grau)', titel: esc(t.titel),
+      unter: esc(t.detail), rechts: dKurz(t.datum), fett: false})).concat(todosKurz())) +
     `<h3>Was übrig bleibt <small>auf einen Monat tippen</small></h3><div class="karte">` +
     stapel(verl.map(x => ({id: x.monat, l: MON[+x.monat.slice(5, 7) - 1], w: [x.saldo, x.vermietung]})), ['var(--blau)', 'var(--gruen)'], {akt: 's_monat'}) +
     `<div class="klein"><span style="color:var(--blau)">●</span> privat &nbsp; <span style="color:var(--gruen)">●</span> Vermietung</div></div>`;
@@ -306,12 +313,12 @@ function vGeld() {
     kachel('s_cf', 'Cashflow ' + mKurz(D.monat), eur(jetzt ? jetzt.cashflow : 0), 'Plan: Mieten − Kosten − Rate', (jetzt && jetzt.cashflow > 0) ? 'gut' : 'schlecht') +
     kachel('s_ek', 'EK-Rendite', pct(ek, 1), 'pro Jahr inkl. Tilgung') + `</div>`;
   if (cf.length) {
-    h += `<h3>Plan-Cashflow <small>nächste 12 Monate</small></h3><div class="karte">` +
+    h += `<h3>Plan-Cashflow <small>auf einen Monat tippen</small></h3><div class="karte">` +
       stapel(cf.slice(0, 13).map(x => ({id: x.monat, l: MON[+x.monat.slice(5, 7) - 1], w: [x.cashflow]})), ['var(--blau)'],
-        {ziele: [{v: V.ziel_cashflow.teilzeit, c: 'var(--orange)'}, {v: V.ziel_cashflow.ausstieg, c: 'var(--lila)'}]}) +
+        {akt: 's_cfm', ziele: [{v: V.ziel_cashflow.teilzeit, c: 'var(--orange)'}, {v: V.ziel_cashflow.ausstieg, c: 'var(--lila)'}]}) +
       `<div class="klein"><span style="color:var(--orange)">- - -</span> Ziel Teilzeit ${eur(V.ziel_cashflow.teilzeit)} &nbsp; <span style="color:var(--lila)">- - -</span> Ziel Ausstieg ${eur(V.ziel_cashflow.ausstieg)}</div></div>`;
   }
-  h += `<h3>Kredite</h3>` + liste(V.kredite.map(k => zeile({titel: esc(k.name), unter: `${pct(k.zins, 2)} · Rate ${eur(k.rate, true)} · Zinsbindung bis ${dDe(k.zinsbindung_bis)}`,
+  h += `<h3>Kredite</h3>` + liste(V.kredite.map((k, j) => zeile({titel: esc(k.name), akt: `s_kredit|${j}`, unter: `${pct(k.zins, 2)} · Rate ${eur(k.rate, true)} · Zinsbindung bis ${dDe(k.zinsbindung_bis)}`,
     rechts: `${eur(k.restschuld)}<br><span style="font-weight:400;font-size:.75rem;color:var(--text2)">Restschuld</span>`})));
   (V.kennzahlen || []).forEach(k => {
     h += `<h3>Kennzahlen <small>${esc(k.objekt)}</small></h3><div class="karte">` +
@@ -331,7 +338,8 @@ function vSteuer() {
     kachel('s_steuer', 'Werbungskosten', eur(s.werbungskosten), 'Zinsen, AfA, Kosten') + `</div>`;
   Object.entries(gruppen).forEach(([obj, ps]) => {
     h += `<h3>${esc(obj)} <small>Ergebnis ${eur(ps.reduce((a, p) => a + p.betrag, 0))}</small></h3>` + liste(ps.map(p => zeile({
-      titel: esc(p.position), unter: p.bereich, rechts: `<span class="${ton(p.betrag)}">${eur(p.betrag)}</span>`})));
+      titel: esc(p.position), unter: p.bereich, akt: steuerZiel(p.position) ? `s_stpos|${s.positionen.indexOf(p)}` : null,
+      rechts: `<span class="${ton(p.betrag)}">${eur(p.betrag)}</span>`})));
   });
   return h + `<div class="klein">Grobe Schätzung aus Planwerten und gebuchten Kosten – keine Steuerberatung. Das Steuerpaket gibt es am PC.</div>`;
 }
@@ -350,25 +358,29 @@ function privat() {
     kachel('p_saldo', 'Übrig', eur(z.saldo), 'Einnahmen − Ausgaben', z.saldo >= 0 ? 'gut' : 'schlecht') +
     kachel('p_quote', 'Sparquote', z.sparquote == null ? '–' : pct(z.sparquote, 0), 'übrig ÷ Einnahmen') + `</div>`;
   if (gr.length) h += `<h3>Wofür das Geld ausgegeben wird</h3><div class="karte">${donut(gr)}</div>`;
-  if (kat.length) h += `<h3>Kategorien <small>Strich = Ø der letzten 6 Monate</small></h3><div class="karte">` +
-    hbalken(kat.slice(0, 12).map((k, j) => ({l: k.k, v: k.v, avg: schn.get(k.k), c: farbeGruppe(k.g, j), akt: `s_kat|${m}|a|${k.k}`}))) + `</div>`;
+  if (kat.length) h += `<h3>Kategorien <small>antippen für Details · Strich = Ø 6 Monate</small></h3>` +
+    kurzBalken(kat.map((k, j) => ({l: k.k, v: k.v, avg: schn.get(k.k), c: farbeGruppe(k.g, j), akt: `s_kat|${m}|a|${k.k}`})), 6);
   h += `<h3>Verlauf <small>auf einen Monat tippen</small></h3><div class="karte">` +
     stapel(P().monate.slice(-12).map(x => ({id: x.monat, l: MON[+x.monat.slice(5, 7) - 1], w: [x.einnahmen, -x.ausgaben]})), ['var(--gruen)', 'var(--rot)'],
       {akt: 's_pmonat', linie: P().monate.slice(-12).map(x => x.saldo)}) +
     `<div class="klein"><span style="color:var(--gruen)">●</span> Einnahmen &nbsp; <span style="color:var(--rot)">●</span> Ausgaben &nbsp; <span style="color:var(--blau)">●</span> übrig</div></div>`;
   const fix = P().fixkosten;
   if (fix.length) h += `<h3>Fixkosten & Abos <small>${eur(fix.reduce((s, f) => s + f.monat, 0))} / Monat</small></h3>` +
-    liste(fix.slice(0, 15).map(f => zeile({titel: esc(f.name), unter: `${esc(f.kategorie)} · ${esc(f.rhythmus)}`, rechts: eur(f.monat, true)})));
-  const rat = P().raten.filter(r => r.aktiv);
+    kurzListe(fix.map((f, j) => zeile({titel: esc(f.name), akt: `s_fix|${j}`,
+      unter: `${esc(f.kategorie)} · ${esc(f.rhythmus)}${f.aenderung ? ` · <span class="${f.aenderung > 0 ? 'neg' : 'pos'}">${f.aenderung > 0 ? 'teurer' : 'günstiger'} ${pct(Math.abs(f.aenderung), 0)}</span>` : ''}`,
+      rechts: eur(f.monat, true)})), 5);
+  const rat = P().raten.map((r, j) => ({...r, j})).filter(r => r.aktiv);
   if (rat.length) h += `<h3>Raten & Kredite <small>${eur(P().raten_summe)} / Monat</small></h3>` +
-    liste(rat.map(r => zeile({titel: esc(r.name), unter: `${esc(r.art)} · zuletzt ${dDe(r.letzte)}`, rechts: eur(r.monat, true)})));
-  if (P().konten.length) h += `<h3>Konten <small>${eur(P().konten.reduce((s, k) => s + k.stand, 0))}</small></h3>` +
+    liste(rat.map(r => zeile({titel: esc(r.name), akt: `s_rate|${r.j}`, unter: `${esc(r.art)} · zuletzt ${dDe(r.letzte)}`, rechts: eur(r.monat, true)})));
+  const kontoSumme = P().konten.reduce((s, k) => s + (k.stand || 0), 0);
+  if (P().konten.length && P().konten.some(k => k.stand)) h += `<h3>Konten <small>${eur(kontoSumme)}</small></h3>` +
     liste(P().konten.map(k => zeile({titel: esc(k.konto), rechts: eur(k.stand, true)})));
+  h += sparzieleHtml();
   const bud = Object.entries(P().budgets);
   if (bud.length) {
     const ist = new Map(nachKategorie(m, 'a').map(k => [k.k, k.v]));
-    h += `<h3>Budgets</h3><div class="karte">` + hbalken(bud.map(([k, b]) => ({l: k, v: ist.get(k) || 0, avg: b, text: `${eur(ist.get(k) || 0)} von ${eur(b)}`,
-      c: (ist.get(k) || 0) > b ? 'var(--rot)' : 'var(--blau)'}))) + `</div>`;
+    h += `<h3>Budgets <small>${mLang(m)}</small></h3><div class="karte">` + hbalken(bud.map(([k, b]) => ({l: k, v: ist.get(k) || 0, avg: b, text: `${eur(ist.get(k) || 0)} von ${eur(b)}`,
+      c: (ist.get(k) || 0) > b ? 'var(--rot)' : 'var(--blau)', akt: `s_kat|${m}|a|${k}`}))) + `</div>`;
   }
   return h;
 }
@@ -410,10 +422,10 @@ function suche() {
 
 function mehr() {
   const gesp = S.gesp && S.gesp.modus === 'gesperrt', t = D.termine;
-  const gr = {}; t.forEach(x => (gr[x.datum.slice(0, 7)] = gr[x.datum.slice(0, 7)] || []).push(x));
-  return kopf('Mehr', 'Mehr') + werkzeugeHtml() + erfassungenHtml() +
-    `<h3>Termine & Fristen</h3>` + Object.entries(gr).map(([m, ts]) => `<div class="klein" style="margin-top:12px"><b>${mLang(m)}</b></div>` +
-      liste(ts.map(x => zeile({punkt: ARTEN[x.art] || 'var(--grau)', titel: esc(x.titel), unter: esc(x.detail), rechts: dKurz(x.datum), fett: false})))).join('') +
+  const bald = new Date(new Date(D.heute).getTime() + 42 * 864e5).toISOString().slice(0, 10), naechste = t.filter(x => x.datum <= bald);
+  return kopf('Mehr', 'Mehr') + werkzeugeHtml() + todosHtml() + erfassungenHtml() +
+    `<h3>Termine & Fristen <small>nächste 6 Wochen</small></h3>` + liste((naechste.length ? naechste : t.slice(0, 3)).map(terminZeile)) +
+    (t.length > naechste.length ? `<button class="mehr-knopf" data-a="s_termine">Alle ${t.length} Termine anzeigen</button>` : '') +
     `<h3>Daten auf diesem Handy</h3><div class="karte">${kv('Stand', dDe(D.stand) + ' ' + D.stand.slice(11))}${kv('Buchungen', nf0.format(D.buchungen.length))}` +
     `${kv('Verträge', D.vermietung.vertraege.length)}${kv('Passwort beim Öffnen', gesp ? 'ja' : 'nein')}</div>` +
     `<label class="knopf">Neue Daten laden<input type="file" id="datei2" hidden></label>` +
@@ -422,6 +434,13 @@ function mehr() {
     `<button class="knopf rot" data-a="loeschen">Daten von diesem Handy löschen</button>` +
     `<div class="klein">Die Daten liegen nur in diesem Handy und wurden nie über das Internet übertragen. Änderungen machst du am PC – danach eine neue Datei erstellen und hier laden.<br><br>` +
     `Tipp: In Safari auf „Teilen“ → „Zum Home-Bildschirm“, dann startet die App wie eine normale App – auch ohne Internet.</div>`;
+}
+
+const terminZeile = x => zeile({punkt: ARTEN[x.art] || 'var(--grau)', titel: esc(x.titel), unter: esc(x.detail), rechts: dKurz(x.datum), fett: false});
+function sheetTermine() {
+  const gr = {}; D.termine.forEach(x => (gr[x.datum.slice(0, 7)] = gr[x.datum.slice(0, 7)] || []).push(x));
+  sheet('Termine & Fristen', Object.entries(gr).map(([m, ts]) => `<h3>${mLang(m)}</h3>` + liste(ts.map(terminZeile))).join('') +
+    `<div class="klein">Farben: <span style="color:${ARTEN.Mieter}">●</span> Mieter · <span style="color:${ARTEN.Zahlung}">●</span> Zahlung · <span style="color:${ARTEN.Frist}">●</span> Frist · <span style="color:${ARTEN.Steuer}">●</span> Steuer</div>`);
 }
 
 // ====================================================================== Detail-Fenster
@@ -435,9 +454,14 @@ function sheetVerm() {
     (v.konten_fehlen ? `<div class="klein">Kontostände fehlen noch – am PC eintragen.</div>` : ''));
 }
 function sheetFrei() {
-  const f = D.cockpit.frei;
-  sheet('Monatlich frei', `<div class="gross ${ton(f.wert)}">${eur(f.wert)}</div><div class="unterz">Was dir in einem normalen Monat übrig bleibt</div>` +
-    `<div class="karte">${wasserfall(f.schritte, 'frei')}</div><div class="klein">Privat = Median der letzten 6 vollständigen Monate. Vermietung = Plan laut Verträgen. In der Kreditrate steckt Tilgung – das ist Vermögensaufbau, kein verlorenes Geld.</div>`);
+  const f = D.cockpit.frei, ziel = ['s_typisch', 's_soll', 's_cf', D.vermietung.kredite.length ? 's_kredit|0' : null];
+  const k = D.vermietung.kredite[0], tilg = k && k.restschuld ? k.rate - k.restschuld * k.zins / 12 : 0;
+  sheet('Monatlich frei', `<div class="gross ${ton(f.wert)}">${eur(f.wert)}</div><div class="unterz">Was dir in einem normalen Monat übrig bleibt · Zeile antippen = Details</div>` +
+    `<div class="karte">${wasserfall(f.schritte.map((s, i) => [s[0], s[1], ziel[i]]), 'frei')}</div>` +
+    (tilg > 0 ? `<div class="karte tipp">Von der Kreditrate sind gerade <b>${eur(tilg)}</b> Tilgung – das Geld ist nicht weg, es wird zu Eigentum an der Wohnung.</div>` : '') +
+    erkl(`<b>Privat übrig</b> ist der mittlere Wert (Median) der letzten 6 abgeschlossenen Monate – ein einzelner teurer Monat verzerrt ihn nicht.<br>` +
+      `<b>Mieten</b> und <b>Kosten</b> sind Planwerte laut Verträgen und Einstellungen, nicht die tatsächlichen Kontobewegungen.<br>` +
+      `<b>frei</b> = Privat übrig + Mieten − Kosten − Kreditrate.`));
 }
 function sheetMieten() {
   const c = D.cockpit.mieten;
@@ -450,25 +474,32 @@ function sheetCheck() {
     liste(ck.punkte.map(p => zeile({punkt: p.ok ? 'var(--gruen)' : 'var(--orange)', titel: esc(p.text), fett: false}))));
 }
 function sheetWichtig(i) {
-  const w = D.cockpit.wichtig[i]; if (!w) return;
-  sheet(w.titel, `<div class="karte" style="line-height:1.5">${esc(w.text || w.titel)}${w.betrag ? `<div class="gross neg" style="margin-top:10px">${eur(w.betrag)}</div>` : ''}</div>`);
+  const w = wichtigListe()[i]; if (!w) return;
+  if (w.akt) { const [n, ...p] = w.akt.split('|'); return AKT[n](...p); }    // Budget-Hinweise öffnen direkt die Kategorie
+  const r = w.vertrag ? D.vermietung.rueckstaende.find(x => x.vertrag === w.vertrag) : null;
+  sheet(w.titel, (w.betrag ? `<div class="gross neg">${eur(w.betrag)}</div><div class="unterz">offen</div>` : '') +
+    (w.text ? `<div class="karte" style="line-height:1.5">${esc(w.text)}</div>` : '') +
+    (r && r.monate.length ? `<h3>Offene Monate</h3>` + liste(r.monate.map(x => zeile({punkt: x.ist > 0 ? 'var(--orange)' : 'var(--rot)', titel: mLang(x.monat),
+      unter: `Soll ${eur(x.soll, true)} · bezahlt ${eur(x.ist, true)}`, rechts: `<span class="neg">${eur(x.ist - x.soll)}</span>`, akt: `s_mmonat|${w.vertrag}|${x.monat}`}))) : '') +
+    (w.vertrag ? `<button class="knopf" data-a="s_mieter|${esc(w.vertrag)}">Mieterkonto öffnen</button>` : ''));
 }
 function sheetMonat(m) {
   const x = P().monate.find(a => a.monat === m); if (!x) return;
   const gesamt = x.saldo + x.vermietung;
-  sheet(mLang(m), `<div class="gross ${ton(gesamt)}">${eur(gesamt)}</div><div class="unterz">privat + Vermietung (laut Konto)</div>` +
-    `<div class="karte">${wasserfall([['Privat rein', x.einnahmen], ['Privat raus', -x.ausgaben], ['Vermietung (netto)', x.vermietung]], 'übrig')}</div>`);
+  sheet(mLang(m), `<div class="gross ${ton(gesamt)}">${eur(gesamt)}</div><div class="unterz">privat + Vermietung (laut Konto) · Zeile antippen</div>` +
+    `<div class="karte">${wasserfall([['Privat rein', x.einnahmen, `p_ein_m|${m}`], ['Privat raus', -x.ausgaben, `p_aus_m|${m}`], ['Vermietung (netto)', x.vermietung, `s_vmonat|${m}`]], 'übrig')}</div>` +
+    erkl('Anders als „Monatlich frei“ zeigt das hier, was in diesem Monat <b>tatsächlich</b> auf den Konten passiert ist – einmalige Ausgaben eingeschlossen. Umbuchungen zwischen deinen eigenen Konten zählen nicht.'));
 }
 function sheetMieter(id) {
   const v = D.vermietung.vertraege.find(x => x.id === id); if (!v) return;
   const saldo = v.konto.reduce((s, r) => s + r.ist - r.soll, 0), offen = saldo < -0.5;
   sheet(v.mieter, `<div class="gross ${offen ? 'neg' : ''}">${offen ? eur(-saldo) + ' offen' : saldo > 0.5 ? eur(saldo) + ' Guthaben' : 'ausgeglichen'}</div>` +
     `<div class="unterz">${esc(v.einheit)} · ${esc(v.objekt)} · <span class="chip">${esc(v.status)}</span></div>` +
-    (v.konto.length ? `<h3 style="margin-top:6px">Mieterkonto</h3>` + liste(v.konto.slice().reverse().map(r => {
+    (v.konto.length ? `<h3 style="margin-top:6px">Mieterkonto <small>Monat antippen = Zahlungen</small></h3>` + kurzListe(v.konto.slice().reverse().map(r => {
       const d = r.ist - r.soll;
       return zeile({punkt: d >= -0.5 ? 'var(--gruen)' : r.ist > 0 ? 'var(--orange)' : 'var(--rot)', titel: mLang(r.monat), unter: `Soll ${eur(r.soll, true)} · bezahlt ${eur(r.ist, true)}`,
-        rechts: d >= -0.5 ? '<span class="pos">ok</span>' : `<span class="neg">${eur(d)}</span>`});
-    })) : '') +
+        rechts: d >= -0.5 ? '<span class="pos">ok</span>' : `<span class="neg">${eur(d)}</span>`, akt: `s_mmonat|${v.id}|${r.monat}`});
+    }), 6) : '') +
     `<h3>Vertrag</h3><div class="karte">${kv('Warmmiete', eur(v.warm, true))}${v.kalt ? kv('davon kalt', eur(v.kalt, true)) : ''}` +
     `${kv('Mietbeginn', dDe(v.von))}${kv('Mietende', v.bis ? dDe(v.bis) : 'unbefristet')}` +
     `${kv('Zahler', v.zahler.map(z => esc(z.name) + ' ' + eur(z.betrag)).join('<br>') || '–')}` +
@@ -477,9 +508,10 @@ function sheetMieter(id) {
 }
 function sheetCf() {
   const V = D.vermietung, j = V.cashflow[0];
-  sheet('Cashflow ' + mLang(D.monat), `<div class="gross ${ton(j ? j.cashflow : 0)}">${eur(j ? j.cashflow : 0)}</div><div class="unterz">Mieten − laufende Kosten − Kreditrate (Plan)</div>` +
-    `<div class="karte">${wasserfall(V.cashflow_schritte, 'Cashflow')}</div>` +
-    (j && j.tilgung ? `<div class="klein">Davon Tilgung ${eur(j.tilgung)}: Damit zahlst du den Kredit ab – das Geld wird zu Eigenkapital in der Wohnung.</div>` : ''));
+  sheet('Cashflow ' + mLang(D.monat), `<div class="gross ${ton(j ? j.cashflow : 0)}">${eur(j ? j.cashflow : 0)}</div><div class="unterz">Mieten − laufende Kosten − Kreditrate (Plan) · Zeile antippen</div>` +
+    `<div class="karte">${wasserfall(V.cashflow_schritte.map(s => [s[0], s[1], cfZiel(s[0])]), 'Cashflow')}</div>` +
+    (j && j.tilgung ? `<div class="karte tipp">Davon Tilgung <b>${eur(j.tilgung)}</b>: Damit zahlst du den Kredit ab – das Geld wird zu Eigenkapital in der Wohnung.</div>` : '') +
+    erkl('Planwerte: Mieten laut Verträgen, Kosten laut Einstellungen (Objekt), Kreditrate laut Kreditvertrag. Tippe auf eine Kostenzeile, um sie mit den tatsächlich gebuchten Beträgen zu vergleichen.'));
 }
 function sheetEk() {
   const V = D.vermietung, k = V.kennzahlen || [];
@@ -507,17 +539,12 @@ function sheetQuote(m) {
     liste(P().monate.slice(-12).reverse().map(x => zeile({titel: mLang(x.monat), rechts: x.sparquote == null ? '–' : `<span class="${ton(x.sparquote)}">${pct(x.sparquote, 0)}</span>`}))) +
     `<div class="klein">Sparquote = übrig ÷ Einnahmen. 10–20 % gelten als solide, mehr als 20 % als sehr gut.</div>`);
 }
-function sheetKat(m, art, k) {
-  const r = D.buchungen.filter(b => b[6] === 'P' && b[7] === k && b[1].slice(0, 7) === m);
-  const sum = r.reduce((s, b) => s + b[2], 0);
-  sheet(k, `<div class="gross">${eur(Math.abs(sum))}</div><div class="unterz">${mLang(m)} · ${r.length} Buchungen</div>` + liste(r.map(buchRow)));
-}
 function sheetBuchung(id) {
   const b = D.buchungen.find(x => x[0] === +id); if (!b) return;
   sheet('Buchung', `<div class="gross ${ton(b[2])}">${eur(b[2], true)}</div><div class="unterz">${esc(b[3] || '–')}</div><div class="karte">` +
     kv('Datum', dDe(b[1])) + kv('Verwendungszweck', esc(b[4] || '–')) + kv('Konto', esc(b[5] || '–')) +
     kv('Bereich', b[6] === 'V' ? 'Vermietung' : 'Privat') + kv('Kategorie', esc(b[7])) + (b[9] ? kv('Objekt', esc(b[9])) : '') +
-    (b[10] ? kv('Vertrag', esc(b[10])) : '') + kv('Beleg', b[11] ? 'abgelegt (am PC)' : 'keiner') + `</div>`);
+    (b[10] ? kv('Vertrag', esc(b[10])) : '') + kv('Beleg', b[11] ? 'abgelegt (am PC)' : 'keiner') + `</div>` + gleicherEmpfaenger(b));
 }
 
 // ====================================================================== Aktionen
