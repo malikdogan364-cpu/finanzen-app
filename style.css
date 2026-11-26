@@ -53,6 +53,26 @@ button.zeile:active { background: var(--fuell); }
 .zeile .nb { color: var(--text2); font-size: .85rem; white-space: nowrap; text-align: right; }
 .zeile .nb.b { color: var(--text); font-weight: 600; font-size: .98rem; }
 .pfeil::after { content: "›"; color: var(--text2); opacity: .6; margin-left: 4px; font-size: 1.2rem; }
+
+/* Nachvollziehen: antippbare Diagrammzeilen, eingeklappte Erklärungen, gekürzte Listen */
+.wf-klick .wf-r { width: 100%; text-align: left; grid-template-columns: 31% 1fr 22% 8px; border-radius: 8px; color: inherit; }
+button.wf-r:active { background: var(--fuell); }
+.wf-klick .wf-r.pfeil::after { margin-left: 0; font-size: 1rem; }
+.hb[data-a] { display: block; width: 100%; text-align: left; color: inherit; }
+.hb[data-a] .z span:first-child::after { content: " ›"; color: var(--text2); opacity: .6; }
+button.hb:active { opacity: .6; }
+.kurz:not(.offen) .zu { display: none; }
+.mehr-knopf { display: block; width: 100%; text-align: center; color: var(--blau); font-weight: 500; font-size: .9rem; padding: 10px 0 2px; }
+.erkl { margin: 14px 0 4px; font-size: .84rem; }
+.erkl summary { list-style: none; cursor: pointer; color: var(--blau); font-weight: 500; padding: 4px 2px; display: inline-flex; align-items: center; gap: 6px; }
+.erkl summary::-webkit-details-marker { display: none; }
+.erkl summary::before { content: "i"; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  border: 1.5px solid currentColor; font: 600 .7rem/1 -apple-system, system-ui, sans-serif; }
+.erkl[open] summary { color: var(--text2); }
+.erkl > div { margin-top: 6px; line-height: 1.55; color: var(--text); background: var(--karte); border-radius: 14px; padding: 12px 14px; box-shadow: var(--schatten); }
+.karte.tipp { margin-top: 10px; font-size: .88rem; line-height: 1.45; background: color-mix(in srgb, var(--gruen) 11%, var(--karte)); box-shadow: none; }
+.karte.tipp.warn { background: color-mix(in srgb, var(--orange) 13%, var(--karte)); }
+.karte.leer { color: var(--text2); text-align: center; }
 .leer { color: var(--text2); text-align: center; padding: 22px 10px; }
 .pos { color: var(--gut); } .neg { color: var(--schlecht); }
 .chip { display: inline-block; font-size: .7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--fuell);
